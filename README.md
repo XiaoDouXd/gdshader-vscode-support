@@ -1,13 +1,12 @@
 # GDShader Support for VS Code
 
-<p align="center">
-  <strong>Complete GDShader (Godot Shading Language) development support for Visual Studio Code</strong>
-</p>
+![img1](./docs/img/img1.png)
 
-<!-- Preview screenshot placeholder -->
-<p align="center">
-  <!-- TODO: Insert preview screenshot here -->
-</p>
+![img2](./docs/img/img2.png)
+
+![img3](./docs/img/img3.png)
+
+![img4](./docs/img/img4.png)
 
 ---
 

@@ -1,13 +1,12 @@
 # GDShader Support for VS Code
 
-<p align="center">
-  <strong>为 VS Code 提供完整的 Godot 着色语言（GDShader）开发支持</strong>
-</p>
+![img1](./docs/img/img1.png)
 
-<!-- 预览截图位置 -->
-<p align="center">
-  <!-- TODO: 插入预览图 -->
-</p>
+![img2](./docs/img/img2.png)
+
+![img3](./docs/img/img3.png)
+
+![img4](./docs/img/img4.png)
 
 ---
 

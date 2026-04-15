@@ -1,0 +1,114 @@
+import { LocaleTable } from './index';
+
+export const en: LocaleTable = {
+  // ── extension.ts ──
+  'ext.activated': 'GDShader Support extension activated.',
+
+  // ── commands.ts ──
+  'cmd.shader.spatial': '3D Spatial Shader',
+  'cmd.shader.canvas_item': '2D Canvas Item Shader',
+  'cmd.shader.particles': 'Particles Shader',
+  'cmd.shader.sky': 'Sky Shader',
+  'cmd.shader.fog': 'Fog Shader',
+  'cmd.template.placeholder': 'Select a shader template to insert',
+  'cmd.template.vertex': 'Vertex processing',
+  'cmd.template.light': 'Custom lighting',
+  'cmd.template.particleInit': 'Particle initialization',
+  'cmd.template.particleProcess': 'Particle processing',
+  'cmd.openGdshaderFile': 'Please open a GDShader file first.',
+  'cmd.color.info': 'Color: rgba({0}, {1}, {2}, {3}) | #{4}',
+  'cmd.color.notFound': 'No color value found at cursor position.',
+
+  // ── renameProvider.ts ──
+  'rename.builtinNotAllowed': 'Built-in symbols cannot be renamed.',
+  'rename.hintDeclareNotAllowed': 'Symbols declared via #gdshader-hint-declare cannot be renamed.',
+  'rename.crossFileNotAllowed': 'This symbol is defined in an external include file. Cross-file rename is not supported.',
+
+  // ── hoverProvider.ts ──
+  'hover.type': '**Type**: `{0}`',
+  'hover.keyword': '**Keyword**: `{0}`',
+  'hover.uniformHint': '**Uniform Hint**: `{0}`',
+  'hover.uniformHint.applicableTypes': 'Applicable types: {0}',
+  'hover.builtinVar.notAvailable': '⚠️ *This variable belongs to {0}() context and is not available here.*',
+  'hover.structMember.declaredAt': '*Member of struct {0}, declared at line {1}*',
+  'hover.declaredAtLine': '*Declared at line {0}*',
+  'hover.parameter': 'parameter',
+  'hover.parameter.declaredAt': '*Parameter, declared at line {0}*',
+  'hover.uniform.declaredAt': '*Uniform, declared at line {0}*',
+  'hover.varying.declaredAt': '*Varying, declared at line {0}*',
+  'hover.userFunction.declaredAt': '*User function, declared at line {0}*',
+  'hover.constant': '**Constant**: `{0}` = {1}',
+  'hover.hintDeclare': '*Declared via `#gdshader-hint-declare`*',
+
+  // ── completionProvider.ts ──
+  'completion.keyword': 'Keyword',
+  'completion.type': 'Type',
+  'completion.builtinConstant': 'Built-in constant',
+  'completion.processorFunction': 'void {0}() - Processor function ({1})',
+  'completion.parameter': 'parameter',
+  'completion.hintDeclare.via': '*Declared via `#gdshader-hint-declare`*',
+  'completion.hintDeclare.detail': '{0} {1} (hint-declare)',
+  'completion.type.forHint': 'Type (for hint-declare)',
+  'completion.preprocessor': 'Preprocessor: {0}',
+  'completion.dir.include': 'Include file',
+  'completion.dir.define': 'Macro definition',
+  'completion.dir.ifdef': 'Conditional (defined)',
+  'completion.dir.ifndef': 'Conditional (not defined)',
+  'completion.dir.if': 'Conditional',
+  'completion.dir.elif': 'Conditional branch',
+  'completion.dir.else': 'Conditional else',
+  'completion.dir.endif': 'End conditional',
+  'completion.dir.undef': 'Undefine macro',
+  'completion.folder': 'Folder',
+  'completion.hint.ignore': 'Ignore diagnostics for this #include',
+  'completion.hint.declare': 'Inject symbol definition (variable or function)',
+  'completion.hint.type': 'Specify type for previous variable',
+  'completion.hint.redirection': 'Redirect include to relative path',
+  'completion.shaderType': 'Shader type: {0}',
+  'completion.renderMode': 'Render mode ({0})',
+  'completion.uniformHint': 'Uniform hint ({0})',
+
+  // ── diagnosticsProvider.ts ──
+  'diag.redirect.notExist': 'Redirection target "{0}" does not exist. Check the #gdshader-hint-redirection path.',
+  'diag.resPath.unresolved': 'Cannot resolve Godot resource path "{0}". Use // #gdshader-hint-redirection:./relative_path to redirect, or // #gdshader-hint-ignore to suppress.',
+  'diag.include.notFound': 'Include file "{0}" not found. Use // #gdshader-hint-redirection:./actual_path to redirect, or // #gdshader-hint-ignore to suppress.',
+  'diag.missingShaderType': 'Missing "shader_type" declaration. GDShader files must start with "shader_type <type>;".',
+  'diag.unknownShaderType': 'Unknown shader type "{0}". Valid types: {1}.',
+  'diag.processorNotApplicable': 'Processor function "{0}()" is not applicable to shader_type {1}. Valid processors: {2}.',
+  'diag.discardNotAllowed': '"discard" cannot be used in {0}(), only in fragment() and light().',
+  'diag.builtinReadonly': 'Built-in variable "{0}" is read-only (in) in {1}() and cannot be written to.',
+
+  // ── analyzer.ts ──
+  'analyzer.builtinConstant': 'Built-in constant: {0} = {1}',
+  'analyzer.hintDeclare': 'Declared via #gdshader-hint-declare',
+  'analyzer.duplicateVar': 'Variable "{0}" is already defined.',
+  'analyzer.shadowParam': 'Variable "{0}" shadows a parameter with the same name.',
+  'analyzer.duplicateDecl': '"{0}" is already defined.',
+  'analyzer.structMemberDuplicate': 'Duplicate member "{1}" in struct "{0}".',
+  'analyzer.funcDuplicate': 'Function "{0}" is already defined.',
+  'analyzer.paramDuplicate': 'Parameter "{0}" is already defined.',
+  'analyzer.undefinedIdent': 'Undefined identifier "{0}".',
+  'analyzer.typeMismatch': 'Type mismatch: cannot assign "{0}" to "{1}".',
+  'analyzer.argCount': 'Function "{0}" expects {1} argument(s), but {2} were provided.',
+  'analyzer.argTypeMismatch': 'Argument "{0}" type mismatch: expected "{1}", got "{2}".',
+
+  // ── parser.ts ──
+  'parser.unexpectedToken': "Unexpected token '{0}'.",
+  'parser.unexpectedTopLevel': "Unexpected top-level token '{0}'.",
+  'parser.expectIdentifier': "Expected identifier, got '{0}'.",
+  'parser.expect': "Expected {0}, got '{1}'.",
+  'parser.missingIfBody': 'Missing if statement body.',
+  'parser.missingForBody': 'Missing for loop body.',
+  'parser.missingWhileBody': 'Missing while loop body.',
+  'parser.missingDoBody': 'Missing do-while loop body.',
+  'parser.switchUnexpected': "Unexpected token '{0}' in switch.",
+
+  // ── lexer.ts ──
+  'lexer.unknownChar': "Unknown character '{0}'.",
+  'lexer.unclosedBlockComment': 'Unclosed block comment.',
+  'lexer.unclosedString': 'Unclosed string.',
+
+  // ── keywords.ts (constant values) ──
+  'const.INF': 'Infinity',
+  'const.NAN': 'Not a Number',
+};

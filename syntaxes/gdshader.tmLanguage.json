@@ -1,0 +1,261 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GDShader",
+  "scopeName": "source.gdshader",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#preprocessor" },
+    { "include": "#shader-type" },
+    { "include": "#render-mode" },
+    { "include": "#group-uniforms" },
+    { "include": "#storage-qualifiers" },
+    { "include": "#control-flow" },
+    { "include": "#struct-definition" },
+    { "include": "#function-definition" },
+    { "include": "#function-call" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#swizzle" },
+    { "include": "#variables" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.documentation.gdshader",
+          "begin": "/\\*\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": { "name": "punctuation.definition.comment.gdshader" }
+          },
+          "patterns": [
+            {
+              "match": "\\[/?[a-z_]+\\]",
+              "name": "markup.bold.gdshader"
+            }
+          ]
+        },
+        {
+          "name": "comment.block.gdshader",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": { "name": "punctuation.definition.comment.gdshader" }
+          }
+        },
+        {
+          "name": "comment.line.double-slash.gdshader",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "keyword.control.preprocessor.gdshader",
+          "match": "^\\s*#\\s*(include|define|undef|ifdef|ifndef|else|endif|pragma)\\b"
+        },
+        {
+          "name": "string.quoted.double.include.gdshader",
+          "match": "(?<=#\\s*include\\s*)\"[^\"]*\""
+        }
+      ]
+    },
+    "shader-type": {
+      "match": "\\b(shader_type)\\s+(spatial|canvas_item|particles|sky|fog)\\b",
+      "captures": {
+        "1": { "name": "keyword.declaration.shader-type.gdshader" },
+        "2": { "name": "support.constant.shader-type.gdshader" }
+      }
+    },
+    "render-mode": {
+      "begin": "\\b(render_mode)\\b",
+      "end": ";",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.render-mode.gdshader" }
+      },
+      "patterns": [
+        { "include": "#comments" },
+        {
+          "name": "support.constant.render-mode.gdshader",
+          "match": "\\b(blend_mix|blend_add|blend_sub|blend_mul|blend_premul_alpha|blend_disabled|depth_draw_opaque|depth_draw_always|depth_draw_never|depth_prepass_alpha|depth_test_disabled|sss_mode_skin|cull_back|cull_front|cull_disabled|unshaded|wireframe|diffuse_burley|diffuse_lambert|diffuse_lambert_wrap|diffuse_toon|specular_schlick_ggx|specular_toon|specular_disabled|skip_vertex_transform|world_vertex_coords|ensure_correct_normals|shadows_disabled|ambient_light_disabled|shadow_to_opacity|vertex_lighting|particle_trails|alpha_to_coverage|alpha_to_coverage_and_one|fog_disabled|light_only|light_vertex_only|unlit|disable_force_vertex_shading)\\b"
+        },
+        {
+          "name": "punctuation.separator.comma.gdshader",
+          "match": ","
+        }
+      ]
+    },
+    "group-uniforms": {
+      "match": "\\b(group_uniforms)\\b(\\s+([a-zA-Z_]\\w*)(\\.[a-zA-Z_]\\w*)*)?",
+      "captures": {
+        "1": { "name": "keyword.other.group-uniforms.gdshader" },
+        "3": { "name": "entity.name.section.group.gdshader" }
+      }
+    },
+    "storage-qualifiers": {
+      "patterns": [
+        {
+          "name": "storage.modifier.gdshader",
+          "match": "\\b(uniform|global\\s+uniform|instance\\s+uniform|varying|const|flat|smooth|in|out|inout|lowp|mediump|highp)\\b"
+        },
+        {
+          "name": "support.type.hint.gdshader",
+          "match": ":\\s*(source_color|hint_color|hint_range|hint_normal|hint_default_white|hint_default_black|hint_default_transparent|hint_anisotropy|hint_roughness|hint_roughness_r|hint_roughness_g|hint_roughness_b|hint_roughness_a|hint_roughness_normal|hint_roughness_gray|hint_screen_texture|hint_depth_texture|hint_normal_roughness_texture|hint_enum|filter_nearest|filter_nearest_mipmap|filter_nearest_mipmap_anisotropic|filter_linear|filter_linear_mipmap|filter_linear_mipmap_anisotropic|repeat_enable|repeat_disable|instance_index)\\b"
+        }
+      ]
+    },
+    "control-flow": {
+      "name": "keyword.control.gdshader",
+      "match": "\\b(if|else|for|while|do|switch|case|default|break|continue|return|discard)\\b"
+    },
+    "struct-definition": {
+      "match": "\\b(struct)\\s+([a-zA-Z_]\\w*)",
+      "captures": {
+        "1": { "name": "storage.type.struct.gdshader" },
+        "2": { "name": "entity.name.type.struct.gdshader" }
+      }
+    },
+    "function-definition": {
+      "match": "\\b([a-zA-Z_]\\w*)\\s*(?=\\([^)]*\\)\\s*\\{)",
+      "captures": {
+        "1": { "name": "entity.name.function.gdshader" }
+      }
+    },
+    "function-call": {
+      "match": "\\b([a-zA-Z_]\\w*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "entity.name.function.call.gdshader" }
+      }
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.basic.gdshader",
+          "match": "\\b(void|bool|int|uint|float)\\b"
+        },
+        {
+          "name": "storage.type.vector.gdshader",
+          "match": "\\b(vec2|vec3|vec4|bvec2|bvec3|bvec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4)\\b"
+        },
+        {
+          "name": "storage.type.matrix.gdshader",
+          "match": "\\b(mat2|mat3|mat4)\\b"
+        },
+        {
+          "name": "storage.type.sampler.gdshader",
+          "match": "\\b(sampler2D|isampler2D|usampler2D|sampler2DArray|isampler2DArray|usampler2DArray|sampler3D|isampler3D|usampler3D|samplerCube|samplerCubeArray|samplerExternalOES)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.gdshader",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.gdshader",
+          "match": "\\b(PI|TAU|E|INF|NAN)\\b"
+        },
+        {
+          "name": "variable.language.builtin.gdshader",
+          "match": "\\b(VERTEX|NORMAL|TANGENT|BINORMAL|UV|UV2|COLOR|POINT_SIZE|INSTANCE_ID|INSTANCE_CUSTOM|POSITION|MODEL_MATRIX|MODEL_NORMAL_MATRIX|VIEW_MATRIX|INV_VIEW_MATRIX|PROJECTION_MATRIX|INV_PROJECTION_MATRIX|VIEWPORT_SIZE|FRAGCOORD|FRONT_FACING|LIGHT_COLOR|LIGHT_ENERGY|LIGHT_IS_DIRECTIONAL|LIGHT_DIRECTION|ATTENUATION|ALBEDO|ALPHA|METALLIC|ROUGHNESS|SPECULAR|RIM|RIM_TINT|AO|AO_LIGHT_AFFECT|EMISSION|NORMAL_MAP|NORMAL_MAP_DEPTH|SSS_STRENGTH|SSS_TRANSMITTANCE_COLOR|SSS_TRANSMITTANCE_DEPTH|SSS_TRANSMITTANCE_BOOST|BACKLIGHT|TRANSMISSION|SCREEN_UV|SCREEN_TEXTURE|DEPTH_TEXTURE|DEPTH|DIFFUSE_LIGHT|SPECULAR_LIGHT|OUTPUT_IS_SRGB|WORLD_POSITION|NODE_POSITION_WORLD|CAMERA_POSITION_WORLD|CAMERA_DIRECTION_WORLD|CAMERA_VISIBLE_LAYERS|NODE_POSITION_VIEW|EYE_OFFSET|LIGHT_VERTEX|SHADOW_ATTENUATION|VIEW|LIGHT|ACTIVE|RESTART|RESTART_POSITION|RESTART_ROT_SCALE|RESTART_VELOCITY|RESTART_COLOR|RESTART_CUSTOM|TRANSFORM|LIFETIME|DELTA|NUMBER|INDEX|EMISSION_TRANSFORM|VELOCITY|CUSTOM|FLAG_EMIT_POSITION|FLAG_EMIT_ROT_SCALE|FLAG_EMIT_VELOCITY|FLAG_EMIT_COLOR|FLAG_EMIT_CUSTOM|COLLIDED|COLLISION_NORMAL|COLLISION_DEPTH|ATTRACTOR_FORCE|SKY_COORDS|HALF_RES_COLOR|QUARTER_RES_COLOR|RADIANCE|LIGHT0_DIRECTION|LIGHT0_ENERGY|LIGHT0_COLOR|LIGHT0_ENABLED|LIGHT1_DIRECTION|LIGHT1_ENERGY|LIGHT1_COLOR|LIGHT1_ENABLED|LIGHT2_DIRECTION|LIGHT2_ENERGY|LIGHT2_COLOR|LIGHT2_ENABLED|LIGHT3_DIRECTION|LIGHT3_ENERGY|LIGHT3_COLOR|LIGHT3_ENABLED|AT_CUBEMAP_PASS|AT_HALF_RES_PASS|AT_QUARTER_RES_PASS|WORLD_POSITION|OBJECT_ID|DENSITY|WORLD_POSITION_JITTERED|TIME)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.gdshader",
+          "match": "\\b0[xX][0-9a-fA-F]+[uU]?\\b"
+        },
+        {
+          "name": "constant.numeric.float.gdshader",
+          "match": "\\b[0-9]+\\.[0-9]*([eE][+-]?[0-9]+)?[fF]?\\b|\\b[0-9]*\\.[0-9]+([eE][+-]?[0-9]+)?[fF]?\\b|\\b[0-9]+[eE][+-]?[0-9]+[fF]?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.gdshader",
+          "match": "\\b[0-9]+[uU]?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.gdshader",
+          "match": "\\+=|-=|\\*=|/=|%=|<<=|>>=|&=|\\^=|\\|=|="
+        },
+        {
+          "name": "keyword.operator.comparison.gdshader",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.gdshader",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.bitwise.gdshader",
+          "match": "&|\\||\\^|~|<<|>>"
+        },
+        {
+          "name": "keyword.operator.arithmetic.gdshader",
+          "match": "\\+|-|\\*|/|%"
+        },
+        {
+          "name": "keyword.operator.ternary.gdshader",
+          "match": "\\?|:"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.gdshader",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.gdshader",
+          "match": ","
+        },
+        {
+          "name": "punctuation.section.braces.begin.gdshader",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.braces.end.gdshader",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.parens.begin.gdshader",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.gdshader",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.gdshader",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.gdshader",
+          "match": "\\]"
+        }
+      ]
+    },
+    "swizzle": {
+      "match": "\\.([xyzw]{1,4}|[rgba]{1,4}|[stpq]{1,4})\\b",
+      "captures": {
+        "1": { "name": "variable.other.swizzle.gdshader" }
+      }
+    },
+    "variables": {
+      "name": "variable.other.gdshader",
+      "match": "\\b[a-zA-Z_]\\w*\\b"
+    }
+  }
+}

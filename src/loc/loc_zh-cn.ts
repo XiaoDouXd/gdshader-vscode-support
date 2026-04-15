@@ -1,0 +1,114 @@
+import { LocaleTable } from './index';
+
+export const zhCN: LocaleTable = {
+  // ── extension.ts ──
+  'ext.activated': 'GDShader Support 插件已激活.',
+
+  // ── commands.ts ──
+  'cmd.shader.spatial': '3D 空间着色器',
+  'cmd.shader.canvas_item': '2D 画布着色器',
+  'cmd.shader.particles': '粒子着色器',
+  'cmd.shader.sky': '天空着色器',
+  'cmd.shader.fog': '雾效着色器',
+  'cmd.template.placeholder': '选择要插入的着色器模板',
+  'cmd.template.vertex': '顶点处理',
+  'cmd.template.light': '自定义光照',
+  'cmd.template.particleInit': '粒子初始化',
+  'cmd.template.particleProcess': '粒子处理',
+  'cmd.openGdshaderFile': '请先打开一个 GDShader 文件.',
+  'cmd.color.info': '颜色: rgba({0}, {1}, {2}, {3}) | #{4}',
+  'cmd.color.notFound': '光标位置未找到颜色值.',
+
+  // ── renameProvider.ts ──
+  'rename.builtinNotAllowed': '内置符号不支持重命名.',
+  'rename.hintDeclareNotAllowed': '通过 #gdshader-hint-declare 声明的符号不支持重命名.',
+  'rename.crossFileNotAllowed': '该符号定义在外部 include 文件中, 不支持跨文件重命名.',
+
+  // ── hoverProvider.ts ──
+  'hover.type': '**类型**: `{0}`',
+  'hover.keyword': '**关键字**: `{0}`',
+  'hover.uniformHint': '**Uniform 提示**: `{0}`',
+  'hover.uniformHint.applicableTypes': '适用类型: {0}',
+  'hover.builtinVar.notAvailable': '⚠️ *此变量属于 {0}() 上下文, 在当前位置不可用.*',
+  'hover.structMember.declaredAt': '*struct {0} 的成员, 声明于第 {1} 行*',
+  'hover.declaredAtLine': '*声明于第 {0} 行*',
+  'hover.parameter': '参数',
+  'hover.parameter.declaredAt': '*参数, 声明于第 {0} 行*',
+  'hover.uniform.declaredAt': '*Uniform, 声明于第 {0} 行*',
+  'hover.varying.declaredAt': '*Varying, 声明于第 {0} 行*',
+  'hover.userFunction.declaredAt': '*用户函数, 声明于第 {0} 行*',
+  'hover.constant': '**常量**: `{0}` = {1}',
+  'hover.hintDeclare': '*通过 `#gdshader-hint-declare` 声明*',
+
+  // ── completionProvider.ts ──
+  'completion.keyword': '关键字',
+  'completion.type': '类型',
+  'completion.builtinConstant': '内置常量',
+  'completion.processorFunction': 'void {0}() - 处理器函数 ({1})',
+  'completion.parameter': '参数',
+  'completion.hintDeclare.via': '*通过 `#gdshader-hint-declare` 声明*',
+  'completion.hintDeclare.detail': '{0} {1} (hint-declare)',
+  'completion.type.forHint': '类型 (用于 hint-declare)',
+  'completion.preprocessor': '预处理器: {0}',
+  'completion.dir.include': '包含文件',
+  'completion.dir.define': '宏定义',
+  'completion.dir.ifdef': '条件编译 (已定义)',
+  'completion.dir.ifndef': '条件编译 (未定义)',
+  'completion.dir.if': '条件编译',
+  'completion.dir.elif': '条件编译分支',
+  'completion.dir.else': '条件编译否则',
+  'completion.dir.endif': '条件编译结束',
+  'completion.dir.undef': '取消宏定义',
+  'completion.folder': '目录',
+  'completion.hint.ignore': '忽略此 #include 的诊断提示',
+  'completion.hint.declare': '注入符号定义 (变量或函数)',
+  'completion.hint.type': '为前一个变量指定类型',
+  'completion.hint.redirection': '将 include 重定向到相对路径',
+  'completion.shaderType': '着色器类型: {0}',
+  'completion.renderMode': '渲染模式 ({0})',
+  'completion.uniformHint': 'Uniform 提示 ({0})',
+
+  // ── diagnosticsProvider.ts ──
+  'diag.redirect.notExist': '重定向目标 "{0}" 不存在. 请检查 #gdshader-hint-redirection 路径.',
+  'diag.resPath.unresolved': '无法解析 Godot 资源路径 "{0}". 使用 // #gdshader-hint-redirection:./相对路径 重定向, 或 // #gdshader-hint-ignore 忽略.',
+  'diag.include.notFound': '找不到 include 文件 "{0}". 使用 // #gdshader-hint-redirection:./实际路径 重定向, 或 // #gdshader-hint-ignore 忽略.',
+  'diag.missingShaderType': '缺少 "shader_type" 声明. GDShader 文件必须以 "shader_type <type>;" 开头.',
+  'diag.unknownShaderType': '未知的着色器类型 "{0}". 有效类型: {1}.',
+  'diag.processorNotApplicable': '处理器函数 "{0}()" 不适用于 shader_type {1}. 有效处理器: {2}.',
+  'diag.discardNotAllowed': '"discard" 不能在 {0}() 中使用, 仅可在 fragment() 和 light() 中使用.',
+  'diag.builtinReadonly': '内置变量 "{0}" 在 {1}() 中是只读的 (in), 不能写入.',
+
+  // ── analyzer.ts ──
+  'analyzer.builtinConstant': '内置常量: {0} = {1}',
+  'analyzer.hintDeclare': '通过 #gdshader-hint-declare 声明',
+  'analyzer.duplicateVar': '变量 "{0}" 重复定义.',
+  'analyzer.shadowParam': '变量 "{0}" 遮蔽了同名参数.',
+  'analyzer.duplicateDecl': '"{0}" 重复定义.',
+  'analyzer.structMemberDuplicate': 'struct "{0}" 中成员 "{1}" 重复定义.',
+  'analyzer.funcDuplicate': '函数 "{0}" 重复定义.',
+  'analyzer.paramDuplicate': '参数 "{0}" 重复定义.',
+  'analyzer.undefinedIdent': '未定义的标识符 "{0}".',
+  'analyzer.typeMismatch': '类型不匹配: 不能将 "{0}" 赋给 "{1}".',
+  'analyzer.argCount': '函数 "{0}" 需要 {1} 个参数, 但传入了 {2} 个.',
+  'analyzer.argTypeMismatch': '参数 "{0}" 类型不匹配: 需要 "{1}", 但传入 "{2}".',
+
+  // ── parser.ts ──
+  'parser.unexpectedToken': "不期望的 token '{0}'.",
+  'parser.unexpectedTopLevel': "不期望的顶层 token '{0}'.",
+  'parser.expectIdentifier': "期望标识符, 但遇到 '{0}'.",
+  'parser.expect': '期望 {0}, 但遇到 \'{1}\'.',
+  'parser.missingIfBody': '缺少 if 语句体.',
+  'parser.missingForBody': '缺少 for 循环体.',
+  'parser.missingWhileBody': '缺少 while 循环体.',
+  'parser.missingDoBody': '缺少 do-while 循环体.',
+  'parser.switchUnexpected': "switch 中不期望的 token '{0}'.",
+
+  // ── lexer.ts ──
+  'lexer.unknownChar': "未知字符 '{0}'.",
+  'lexer.unclosedBlockComment': '未闭合的块注释.',
+  'lexer.unclosedString': '未闭合的字符串.',
+
+  // ── keywords.ts (常量值) ──
+  'const.INF': '无穷大',
+  'const.NAN': '非数字',
+};

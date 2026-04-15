@@ -1,0 +1,174 @@
+{
+  "着色器: spatial (3D)": {
+    "prefix": "shader_spatial",
+    "body": [
+      "shader_type spatial;",
+      "render_mode ${1:blend_mix};",
+      "",
+      "uniform vec4 albedo_color : source_color = vec4(1.0);",
+      "",
+      "void vertex() {",
+      "\t$2",
+      "}",
+      "",
+      "void fragment() {",
+      "\tALBEDO = albedo_color.rgb;",
+      "\tALPHA = albedo_color.a;$3",
+      "}",
+      "",
+      "void light() {",
+      "\t$4",
+      "}"
+    ],
+    "description": "基础 spatial (3D) 着色器模板"
+  },
+  "着色器: canvas_item (2D)": {
+    "prefix": "shader_canvas_item",
+    "body": [
+      "shader_type canvas_item;",
+      "",
+      "uniform vec4 modulate_color : source_color = vec4(1.0);",
+      "",
+      "void vertex() {",
+      "\t$1",
+      "}",
+      "",
+      "void fragment() {",
+      "\tvec4 tex_color = texture(TEXTURE, UV);",
+      "\tCOLOR = tex_color * modulate_color;$2",
+      "}",
+      "",
+      "void light() {",
+      "\t$3",
+      "}"
+    ],
+    "description": "基础 canvas_item (2D) 着色器模板"
+  },
+  "着色器: particles (粒子)": {
+    "prefix": "shader_particles",
+    "body": [
+      "shader_type particles;",
+      "",
+      "uniform float spread : hint_range(0.0, 180.0) = 45.0;",
+      "uniform float lifetime_randomness : hint_range(0.0, 1.0) = 0.0;",
+      "",
+      "void start() {",
+      "\t$1",
+      "}",
+      "",
+      "void process() {",
+      "\t$2",
+      "}"
+    ],
+    "description": "基础粒子着色器模板"
+  },
+  "着色器: sky (天空)": {
+    "prefix": "shader_sky",
+    "body": [
+      "shader_type sky;",
+      "",
+      "uniform vec4 top_color : source_color = vec4(0.3, 0.5, 1.0, 1.0);",
+      "uniform vec4 bottom_color : source_color = vec4(0.1, 0.1, 0.1, 1.0);",
+      "",
+      "void sky() {",
+      "\tCOLOR = mix(bottom_color.rgb, top_color.rgb, clamp(EYEDIR.y, 0.0, 1.0));$1",
+      "}"
+    ],
+    "description": "基础天空着色器模板"
+  },
+  "着色器: fog (雾效)": {
+    "prefix": "shader_fog",
+    "body": [
+      "shader_type fog;",
+      "",
+      "void fog() {",
+      "\tDENSITY = ${1:1.0};",
+      "\tALBEDO = vec3(${2:1.0});",
+      "\tEMISSION = vec3(${3:0.0});$4",
+      "}"
+    ],
+    "description": "基础雾效着色器模板"
+  },
+  "Uniform: 带范围的 float": {
+    "prefix": "uniform_range",
+    "body": [
+      "uniform float ${1:name} : hint_range(${2:0.0}, ${3:1.0}${4:, ${5:0.01}}) = ${6:0.5};"
+    ],
+    "description": "带 hint_range 的 uniform float"
+  },
+  "Uniform: 颜色": {
+    "prefix": "uniform_color",
+    "body": [
+      "uniform vec4 ${1:color} : source_color = vec4(${2:1.0, 1.0, 1.0, 1.0});"
+    ],
+    "description": "带 source_color 提示的 uniform vec4 颜色"
+  },
+  "Uniform: 纹理": {
+    "prefix": "uniform_texture",
+    "body": [
+      "uniform sampler2D ${1:texture_name} : ${2|source_color,hint_normal,hint_default_white,hint_default_black|};"
+    ],
+    "description": "uniform sampler2D 纹理"
+  },
+  "Uniform: 枚举": {
+    "prefix": "uniform_enum",
+    "body": [
+      "uniform int ${1:mode} : hint_enum(\"${2:选项A}\", \"${3:选项B}\") = ${4:0};"
+    ],
+    "description": "带 hint_enum 的 uniform int 枚举"
+  },
+  "函数: vertex": {
+    "prefix": "func_vertex",
+    "body": [
+      "void vertex() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "vertex() 处理器函数"
+  },
+  "函数: fragment": {
+    "prefix": "func_fragment",
+    "body": [
+      "void fragment() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "fragment() 处理器函数"
+  },
+  "函数: light": {
+    "prefix": "func_light",
+    "body": [
+      "void light() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "light() 处理器函数"
+  },
+  "函数: start (粒子)": {
+    "prefix": "func_start",
+    "body": [
+      "void start() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "start() 处理器函数 (粒子着色器)"
+  },
+  "函数: process (粒子)": {
+    "prefix": "func_process",
+    "body": [
+      "void process() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "process() 处理器函数 (粒子着色器)"
+  },
+  "Uniform 分组": {
+    "prefix": "group_uniforms",
+    "body": [
+      "group_uniforms ${1:GroupName};",
+      "uniform ${2:float} ${3:name} = ${4:0.0};",
+      "group_uniforms;"
+    ],
+    "description": "uniform 分组块"
+  }
+}

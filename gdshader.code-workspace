@@ -1,0 +1,61 @@
+{
+  "folders": [{"path": "."}],
+  "settings": {
+    "editor.tabSize": 2,
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "files.associations": {
+      "*.gdshader": "gdshader",
+      "*.gdshaderinc": "gdshader"
+    },
+    "cSpell.words": [
+      "gdshader",
+      "gdshaderinc",
+      "glsl",
+      "xiaodouxd"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "npm: watch",
+        "type": "npm",
+        "script": "watch",
+        "problemMatcher": "$tsc-watch",
+        "isBackground": true,
+        "presentation": {
+          "reveal": "never"
+        },
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      },
+      {
+        "label": "package vsix",
+        "type": "npm",
+        "script": "package",
+        "problemMatcher": "$tsc",
+        "presentation": {
+          "reveal": "always",
+          "panel": "shared"
+        },
+        "group": "build"
+      },
+      {
+        "label": "npm: compile",
+        "type": "npm",
+        "script": "compile",
+        "problemMatcher": "$tsc",
+        "presentation": {
+          "reveal": "never"
+        },
+        "group": "build"
+      }
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": []
+  }
+}

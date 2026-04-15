@@ -1,0 +1,131 @@
+{
+  "name": "gdshader-support",
+  "displayName": "GDShader Support",
+  "description": "GDShader (Godot 着色语言) VS Code 支持 - 语法高亮, 代码补全, 语法检查, 实用工具等.",
+  "version": "0.0.1",
+  "publisher": "xiaodouxd",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "godot",
+    "gdshader",
+    "shader",
+    "glsl",
+    "shading language"
+  ],
+  "activationEvents": [
+    "onLanguage:gdshader"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gdshader",
+        "aliases": [
+          "GDShader",
+          "Godot Shader",
+          "gdshader"
+        ],
+        "extensions": [
+          ".gdshader",
+          ".gdshaderinc"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/gdshader-light.svg",
+          "dark": "./icons/gdshader-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gdshader",
+        "scopeName": "source.gdshader",
+        "path": "./syntaxes/gdshader.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "gdshader",
+        "path": "./snippets/gdshader.json"
+      }
+    ],
+    "configuration": {
+      "title": "GDShader Support",
+      "properties": {
+        "gdshader.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用/禁用 GDShader 语法诊断."
+        },
+        "gdshader.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用/禁用 GDShader 代码补全."
+        },
+        "gdshader.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用/禁用 GDShader 悬停提示."
+        },
+        "gdshader.format.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用/禁用 GDShader 文档格式化."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "gdshader.generateColorPreview",
+        "title": "GDShader: 预览颜色"
+      },
+      {
+        "command": "gdshader.insertShaderTemplate",
+        "title": "GDShader: 插入着色器模板"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "gdshader",
+        "scopes": {
+          "type": ["entity.name.type.struct.gdshader", "storage.type.gdshader"]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "npm run compile && node ./out/test/run-all.js",
+    "test:data": "npm run compile && node ./out/test/data.test.js",
+    "test:diagnostics": "npm run compile && node ./out/test/diagnostics.test.js",
+    "test:context": "npm run compile && node ./out/test/context.test.js",
+    "test:parser": "npm run compile && node ./out/test/parser.test.js",
+    "test:analyzer": "npm run compile && node ./out/test/analyzer.test.js",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/vsce": "^3.8.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}

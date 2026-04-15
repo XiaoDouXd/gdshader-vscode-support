@@ -1,0 +1,47 @@
+/**
+ * GDShader 语言数据定义 (兼容层)
+ * 从 src/data/ 重新导出, 保持现有代码兼容.
+ * 新代码请直接从 './data' 导入.
+ */
+
+export {
+  // 类型
+  type BuiltinFunction,
+  type BuiltinVariable,
+  // 基础数据
+  SHADER_TYPES,
+  PROCESSOR_FUNCTIONS,
+  SCALAR_TYPES,
+  VECTOR_TYPES,
+  MATRIX_TYPES,
+  SAMPLER_TYPES,
+  ALL_TYPES,
+  CONTROL_KEYWORDS,
+  STORAGE_QUALIFIERS,
+  ALL_KEYWORDS,
+  BUILTIN_CONSTANTS,
+  CONSTANT_VALUES,
+  // 渲染模式
+  RENDER_MODES,
+  // Uniform 提示
+  UNIFORM_HINTS,
+  UNIFORM_HINT_DETAILS,
+  // 内置函数
+  BUILTIN_FUNCTIONS,
+  // 内置变量
+  SPATIAL_VERTEX_VARS,
+  SPATIAL_FRAGMENT_VARS,
+  SPATIAL_LIGHT_VARS,
+  CANVAS_ITEM_VERTEX_VARS,
+  CANVAS_ITEM_FRAGMENT_VARS,
+  CANVAS_ITEM_LIGHT_VARS,
+  PARTICLES_START_VARS,
+  PARTICLES_PROCESS_VARS,
+  SKY_VARS,
+  FOG_VARS,
+  BUILTIN_VARS,
+  // 语法规则
+  PROCESSOR_FUNCTION_INFO,
+  SYNTAX_RULES,
+  SYNTAX_FOLLOW_RULES,
+} from './data';

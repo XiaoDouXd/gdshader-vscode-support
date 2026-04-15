@@ -1,0 +1,15 @@
+#  Ignore all files with the name __gitignore__
+__gitignore__*
+
+#  nodejs
+out/
+node_modules/
+
+#  vscode
+.codebuddy/
+.vscode/
+.vscode-test/
+*.vsix
+
+#  mac
+.DS_Store

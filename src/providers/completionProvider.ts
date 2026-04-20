@@ -493,6 +493,18 @@ export class GDShaderCompletionProvider implements vscode.CompletionItemProvider
           return item;
         }
       }
+      case SymbolKind.Macro: {
+        const kind = sym.signature
+          ? vscode.CompletionItemKind.Function
+          : vscode.CompletionItemKind.Constant;
+        const item = new vscode.CompletionItem(sym.name, kind);
+        item.detail = sym.description ?? `#define ${sym.name}`;
+        if (sym.signature && sym.parameters && sym.parameters.length > 0) {
+          const snippetParams = sym.parameters.map((p, i) => `\${${i + 1}:${p.name}}`).join(', ');
+          item.insertText = new vscode.SnippetString(`${sym.name}(${snippetParams})`);
+        }
+        return item;
+      }
       default:
         return null;
     }

@@ -195,6 +195,13 @@ export class GDShaderHoverProvider implements vscode.HoverProvider {
         md.appendMarkdown(`\n\n${loc('hover.hintDeclare')}`);
         break;
       }
+      case SymbolKind.Macro: {
+        md.appendCodeblock(sym.description ?? `#define ${sym.name}`, 'gdshader');
+        if (sym.declLine !== undefined) {
+          md.appendMarkdown(`\n\n${loc('hover.declaredAtLine', sym.declLine + 1)}`);
+        }
+        break;
+      }
       default:
         return null;
     }

@@ -111,6 +111,8 @@ export interface ParameterDeclNode extends ASTNode {
   qualifiers: Token[];
   type: TypeRefNode;
   name: Token;
+  /** 变量名后的数组维度 (如 `float arr[3]`), 为 null 表示非数组或维度写在类型上 */
+  arraySize: Expression | null;
 }
 
 export interface VariableDeclNode extends ASTNode {
@@ -271,7 +273,8 @@ export interface CallExprNode extends ASTNode {
 export interface IndexExprNode extends ASTNode {
   kind: NodeKind.IndexExpr;
   object: Expression;
-  index: Expression;
+  /** 数组下标; 在数组构造器语法 `type[](args)` 中可以为 null 表示空维度 */
+  index: Expression | null;
 }
 
 export interface MemberExprNode extends ASTNode {

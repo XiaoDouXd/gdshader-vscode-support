@@ -164,12 +164,16 @@ export class Lexer {
     const startOffset = this.pos;
     const startLine = this.line;
     const startCol = this.column;
-    // 读到行末 (处理续行符 \)
+    // 读到行末 (处理续行符 \\, 兼容 CRLF 与 LF 两种换行)
     while (this.pos < this.source.length) {
-      if (this.source[this.pos] === '\n') {
-        // 检查前一个非空字符是否为 \
-        if (this.pos > 0 && this.source[this.pos - 1] === '\\') {
-          this.advance(); // 跳过换行, 继续读
+      const ch = this.source[this.pos];
+      if (ch === '\n') {
+        // 向前回溯跳过可能存在的 \r, 然后判断是否是续行反斜杠
+        let k = this.pos - 1;
+        if (k >= 0 && this.source[k] === '\r') k--;
+        if (k >= 0 && this.source[k] === '\\') {
+          // 续行: 吞掉换行, 继续读下一行
+          this.advance();
           continue;
         }
         break;

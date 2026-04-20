@@ -17,4 +17,4 @@ export type {
 export { Parser, ParserDiagnostic } from './parser';
 export { parseShader, ParseResult, findNodeAtOffset, findEnclosingFunction } from './document-cache';
 export { Analyzer, Scope, SymbolInfo, SymbolKind, AnalysisResult, SemanticDiagnostic, ParameterInfo, StructMemberInfo } from './analyzer';
-export { scanHints, HintScanResult, IncludeInfo, HintDef, HintTypeDef } from './hint-scanner';
+export { scanHints, HintScanResult, IncludeInfo, HintDef, HintTypeDef, MacroDef } from './hint-scanner';

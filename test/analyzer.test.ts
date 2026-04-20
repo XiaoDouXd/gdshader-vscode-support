@@ -980,5 +980,268 @@ describe('Fixture - SSR V2 完整 shader', () => {
   });
 });
 
+// ═══════════════════════════════════════════
+// Bug 修复回归测试
+// ═══════════════════════════════════════════
+
+describe('Parser - 数组语法支持 (Bug 修复)', () => {
+  it('应解析 C 风格数组变量声明 `int arr[5];`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  int arr[5];
+  arr[0] = 1;
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '数组声明不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+    const fn = r.ast.declarations[0] as any;
+    const varDecl = fn.body.statements[0];
+    assert.ok(varDecl.arraySize !== null, '应捕获 arraySize');
+  });
+
+  it('应解析类型前置数组声明 `int[5] arr;`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  int[5] arr;
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '类型前置数组不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+  });
+
+  it('应解析空维度数组声明 `int[] arr = int[](1,2,3);`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  int[] arr = int[](1, 2, 3);
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '空维度数组构造器不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+  });
+
+  it('应解析数组构造器 `float[3](1.0, 2.0, 3.0)`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  float arr[3] = float[3](1.0, 2.0, 3.0);
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '数组构造器不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+  });
+
+  it('应解析数组字面量初始化 `int arr[3] = { 1, 2, 3 };`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  int arr[3] = { 1, 2, 3 };
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '数组字面量不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+  });
+
+  it('应解析 C 风格数组参数 `void f(float arr[5])`', () => {
+    const r = parseShader(`shader_type spatial;
+float f(float arr[5]) {
+  return arr[0];
+}
+void fragment() {}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '数组参数不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+    const fn = r.ast.declarations[0] as any;
+    assert.ok(fn.parameters[0].arraySize !== null, '参数应有 arraySize');
+  });
+
+  it('应解析 uniform 数组 `uniform vec4 colors[4];`', () => {
+    const r = parseShader(`shader_type spatial;
+uniform vec4 colors[4];
+void fragment() {}`);
+    assert.equal(r.parserDiagnostics.length, 0);
+    const u = r.ast.declarations[0] as any;
+    assert.ok(u.arraySize !== null);
+  });
+
+  it('数组构造器语义分析不应误报未定义', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  int[] arr = int[](1, 2, 3);
+  int x = arr[0];
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error');
+    assert.equal(errs.length, 0,
+      '数组相关代码不应有语义错误: ' + errs.map(e => `L${e.line+1}: ${e.message}`).join('; '));
+  });
+});
+
+describe('DocumentManager - 嵌套 #include 递归处理 (Bug 修复)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { DocumentManager } = require('../src/providers/document-manager');
+
+  function makeTempDir(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gdshader-test-'));
+    return dir;
+  }
+
+  function cleanup(dir: string): void {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  function toUri(p: string): string {
+    return 'file:///' + p.replace(/\\/g, '/');
+  }
+
+  it('嵌套 include 中的符号应可在主文件解析到', () => {
+    const dir = makeTempDir();
+    try {
+      // 三层嵌套: main -> a.gdshaderinc -> b.gdshaderinc
+      const bPath = path.join(dir, 'b.gdshaderinc');
+      fs.writeFileSync(bPath, `vec3 from_b(vec3 x) { return x * 2.0; }\n`);
+      const aPath = path.join(dir, 'a.gdshaderinc');
+      fs.writeFileSync(aPath, `#include "b.gdshaderinc"\nvec3 from_a(vec3 x) { return from_b(x); }\n`);
+      const mainPath = path.join(dir, 'main.gdshader');
+      const mainSrc = `shader_type spatial;
+#include "a.gdshaderinc"
+void fragment() {
+  vec3 r = from_a(vec3(1.0));
+  vec3 r2 = from_b(vec3(1.0));
+  ALBEDO = r + r2;
+}`;
+      fs.writeFileSync(mainPath, mainSrc);
+
+      const dm = new DocumentManager();
+      const info = dm.update(toUri(mainPath), mainSrc);
+      // a 应能看到
+      const fromA = info.analysis.globalScope.resolve('from_a');
+      assert.ok(fromA !== undefined, '应找到 a.gdshaderinc 中的 from_a');
+      // b 嵌套也应能看到 (这是之前的 bug)
+      const fromB = info.analysis.globalScope.resolve('from_b');
+      assert.ok(fromB !== undefined, '应找到嵌套 b.gdshaderinc 中的 from_b (递归 include)');
+
+      // 诊断中不应报 from_b 未定义
+      const undefs = info.analysis.diagnostics.filter((d: any) => d.message.includes('未定义') || d.message.toLowerCase().includes('undefined'));
+      assert.equal(undefs.length, 0, '不应报嵌套 include 符号未定义');
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  it('循环 include 不应导致无限递归', () => {
+    const dir = makeTempDir();
+    try {
+      const aPath = path.join(dir, 'a.gdshaderinc');
+      const bPath = path.join(dir, 'b.gdshaderinc');
+      fs.writeFileSync(aPath, `#include "b.gdshaderinc"\nfloat fa() { return 1.0; }\n`);
+      fs.writeFileSync(bPath, `#include "a.gdshaderinc"\nfloat fb() { return 2.0; }\n`);
+      const mainPath = path.join(dir, 'main.gdshader');
+      const mainSrc = `shader_type spatial;
+#include "a.gdshaderinc"
+void fragment() { float x = fa() + fb(); ALBEDO = vec3(x); }`;
+      fs.writeFileSync(mainPath, mainSrc);
+
+      const dm = new DocumentManager();
+      // 若不防循环则会无限递归 -> 栈溢出; 这里仅期望不抛错并能找到两个符号
+      const info = dm.update(toUri(mainPath), mainSrc);
+      assert.ok(info.analysis.globalScope.resolve('fa') !== undefined, '应找到 fa');
+      assert.ok(info.analysis.globalScope.resolve('fb') !== undefined, '应找到 fb');
+    } finally {
+      cleanup(dir);
+    }
+  });
+});
+
+describe('Lexer/Analyzer - 宏定义 #define 支持 (Bug 修复)', () => {
+  it('Lexer 应正确处理多行 #define 续行符 (LF)', () => {
+    const { Lexer } = require('../src/parser/lexer');
+    const { TokenType } = require('../src/parser/token');
+    const src = `#define MULTI(x) \\\n  ((x) + \\\n   (x) * 2)\nfloat f() { return 1.0; }\n`;
+    const tokens = new Lexer(src).tokenize();
+    // 第一个 token 应是 Preprocessor, 包含整个多行 #define
+    assert.equal(tokens[0].type, TokenType.Preprocessor);
+    assert.ok(tokens[0].value.includes('MULTI'));
+    assert.ok(tokens[0].value.includes('(x) * 2'),
+      '多行 #define 体应被合并到同一个 Preprocessor token 中, got: ' + JSON.stringify(tokens[0].value));
+    // 之后应是 `float f() { return 1.0; }`
+    assert.equal(tokens[1].type, TokenType.KwFloat);
+  });
+
+  it('Lexer 应正确处理多行 #define 续行符 (CRLF)', () => {
+    const { Lexer } = require('../src/parser/lexer');
+    const { TokenType } = require('../src/parser/token');
+    const src = `#define MULTI(x) \\\r\n  ((x) + \\\r\n   (x) * 2)\r\nfloat f() { return 1.0; }\r\n`;
+    const tokens = new Lexer(src).tokenize();
+    assert.equal(tokens[0].type, TokenType.Preprocessor);
+    assert.ok(tokens[0].value.includes('MULTI'));
+    assert.ok(tokens[0].value.includes('(x) * 2'),
+      'CRLF 换行下多行 #define 体也应被合并, got: ' + JSON.stringify(tokens[0].value));
+    assert.equal(tokens[1].type, TokenType.KwFloat);
+  });
+
+  it('scanHints 应识别单行 #define 宏', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#define PI_2 6.28318\nfloat x = PI_2;`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'PI_2');
+    assert.equal(r.macros[0].isFunction, false);
+    assert.ok(r.macros[0].body.includes('6.28318'));
+  });
+
+  it('scanHints 应识别函数式 #define 宏', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#define MUL(a, b) ((a) * (b))\n`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'MUL');
+    assert.equal(r.macros[0].isFunction, true);
+    assert.equal(r.macros[0].parameters!.length, 2);
+    assert.equal(r.macros[0].parameters![0], 'a');
+    assert.equal(r.macros[0].parameters![1], 'b');
+  });
+
+  it('scanHints 应合并多行 #define', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#define MAT_ROW(i) \\\n  (row_##i * \\\n   col)\n`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'MAT_ROW');
+    assert.ok(r.macros[0].body.includes('col'),
+      '多行宏体应被合并, got: ' + r.macros[0].body);
+  });
+
+  it('Analyzer 应把 #define 常量宏注入为符号, 不报未定义', () => {
+    const r = analyze(`shader_type spatial;
+#define MAX_STEPS 64
+void fragment() {
+  int n = MAX_STEPS;
+}`);
+    const sym = r.globalScope.resolve('MAX_STEPS');
+    assert.ok(sym !== undefined, '应解析到 MAX_STEPS 宏');
+    assert.equal(sym!.kind, SymbolKind.Macro);
+    const undefs = r.diagnostics.filter(d => d.message.includes('未定义') && d.message.includes('MAX_STEPS'));
+    assert.equal(undefs.length, 0, '不应报 MAX_STEPS 未定义');
+  });
+
+  it('Analyzer 应把函数式 #define 宏作为符号, 调用时不报未定义', () => {
+    const r = analyze(`shader_type spatial;
+#define SQR(x) ((x) * (x))
+void fragment() {
+  float y = SQR(2.0);
+}`);
+    const sym = r.globalScope.resolve('SQR');
+    assert.ok(sym !== undefined, '应解析到 SQR 宏');
+    assert.equal(sym!.kind, SymbolKind.Macro);
+    const undefs = r.diagnostics.filter(d => d.message.includes('未定义') && d.message.includes('SQR'));
+    assert.equal(undefs.length, 0, '不应报 SQR 未定义');
+  });
+
+  it('Analyzer 应正确处理多行 #define 并注入为符号', () => {
+    const r = analyze(`shader_type spatial;
+#define WRAP(x) \\
+  ((x) + \\
+   1.0)
+void fragment() {
+  float y = WRAP(0.5);
+}`);
+    const sym = r.globalScope.resolve('WRAP');
+    assert.ok(sym !== undefined, '多行宏 WRAP 应被解析');
+    assert.equal(sym!.kind, SymbolKind.Macro);
+    const undefs = r.diagnostics.filter(d => d.message.includes('未定义') && d.message.includes('WRAP'));
+    assert.equal(undefs.length, 0, '不应报多行宏 WRAP 未定义');
+  });
+});
+
 // 运行
 process.exit(summary());

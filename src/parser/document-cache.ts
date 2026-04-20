@@ -131,7 +131,8 @@ function getChildren(node: ASTNode): ASTNode[] {
       children.push(...(n.args ?? []));
       break;
     case NodeKind.IndexExpr:
-      children.push(n.object, n.index);
+      children.push(n.object);
+      if (n.index) children.push(n.index);
       break;
     case NodeKind.MemberExpr:
       children.push(n.object);

@@ -291,7 +291,13 @@ export class Parser {
     }
     const type = this.parseTypeRef();
     const name = this.expect(TokenType.Identifier);
-    return { kind: NodeKind.ParameterDecl, range: tokenRange(start, name), qualifiers, type, name };
+    // 支持 C 风格数组参数: type name[N]
+    let arraySize: AST.Expression | null = null;
+    if (this.match(TokenType.LBracket)) {
+      if (!this.check(TokenType.RBracket)) arraySize = this.parseExpression();
+      this.expect(TokenType.RBracket);
+    }
+    return { kind: NodeKind.ParameterDecl, range: tokenRange(start, this.prev()), qualifiers, type, name, arraySize };
   }
 
   // ═══════════════════════════════════════════
@@ -426,7 +432,6 @@ export class Parser {
   }
 
   private parseVariableDecl(isConst: boolean): AST.VariableDeclNode {
-    const start = this.current();
     if (isConst) this.expect(TokenType.KwConst);
     let precision: Token | null = null;
     if (isPrecisionQualifier(this.current().type)) {
@@ -451,7 +456,6 @@ export class Parser {
       initializer = this.parseExpression();
     }
     this.expect(TokenType.Semicolon);
-    const startTok = isConst ? this.tokens[this.pos - 1] : (precision ?? type.typeName);
     return {
       kind: NodeKind.VariableDecl,
       range: tokenRange(type.typeName, this.prev()),
@@ -741,7 +745,11 @@ export class Parser {
         expr = { kind: NodeKind.MemberExpr, range: tokenRange(expr.range.start as any, member), object: expr, member };
       } else if (this.check(TokenType.LBracket)) {
         this.advance();
-        const index = this.parseExpression();
+        // 支持数组构造器的空维度 `type[](args)` 或有维度 `type[3](args)`
+        let index: AST.Expression | null = null;
+        if (!this.check(TokenType.RBracket)) {
+          index = this.parseExpression();
+        }
         this.expect(TokenType.RBracket);
         expr = { kind: NodeKind.IndexExpr, range: tokenRange(expr.range.start as any, this.prev()), object: expr, index };
       } else if (this.check(TokenType.LParen)) {

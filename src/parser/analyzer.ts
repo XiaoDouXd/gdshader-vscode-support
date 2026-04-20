@@ -40,6 +40,8 @@ export enum SymbolKind {
   BuiltinConstant,
   /** 通过 #gdshader-hint-declare 注入的符号 */
   HintDefined,
+  /** 通过 #define 声明的宏 */
+  Macro,
 }
 
 export interface SymbolInfo {
@@ -210,7 +212,7 @@ export class Analyzer {
     this.sourceLines = source ? source.split('\n') : [];
 
     // 扫描 hint 注释
-    this.hintResult = source ? scanHints(source) : { includes: [], typeHints: [], defHints: [], hasUnresolvedResIncludes: false };
+    this.hintResult = source ? scanHints(source) : { includes: [], typeHints: [], defHints: [], macros: [], hasUnresolvedResIncludes: false };
     this.suppressUndefinedCheck = this.hintResult.hasUnresolvedResIncludes;
 
     // 注入内置常量
@@ -226,6 +228,9 @@ export class Analyzer {
 
     // 注入全局 hint-def 符号 (行号在任意函数体之外的)
     this.injectGlobalHintDefs();
+
+    // 注入 #define 宏
+    this.injectMacros();
 
     // 第一轮: 收集顶层声明 (struct/函数 先注册名称, 使前向引用成立)
     this.collectTopLevelNames(ast);
@@ -266,6 +271,35 @@ export class Analyzer {
   private injectGlobalHintDefs(): void {
     for (const def of this.hintResult.defHints) {
       this.injectHintDef(def, this.globalScope);
+    }
+  }
+
+  /**
+   * 注入 #define 宏到全局作用域.
+   * 作为 Macro 符号存在, 可被 resolve/悬停, 且避免未定义标识符警告.
+   */
+  private injectMacros(): void {
+    if (!this.hintResult.macros) return;
+    for (const m of this.hintResult.macros) {
+      // 不覆盖已有的同名符号 (用户显式声明优先)
+      if (this.globalScope.lookupLocal(m.name)) continue;
+      const sym: SymbolInfo = {
+        name: m.name,
+        kind: SymbolKind.Macro,
+        typeName: 'macro',
+        declLine: m.line,
+        declColumn: 0,
+        description: m.isFunction
+          ? `#define ${m.name}(${(m.parameters ?? []).join(', ')}) ${m.body}`
+          : `#define ${m.name} ${m.body}`,
+      };
+      if (m.isFunction) {
+        sym.signature = `${m.name}(${(m.parameters ?? []).join(', ')})`;
+        sym.parameters = (m.parameters ?? []).map(p => ({
+          name: p, typeName: 'any', qualifier: '',
+        }));
+      }
+      this.globalScope.declare(sym);
     }
   }
 
@@ -701,7 +735,7 @@ export class Analyzer {
       case NodeKind.IndexExpr: {
         const idx = expr as any;
         this.analyzeExpression(idx.object);
-        this.analyzeExpression(idx.index);
+        if (idx.index) this.analyzeExpression(idx.index);
         break;
       }
       case NodeKind.MemberExpr:
@@ -775,7 +809,17 @@ export class Analyzer {
       }
       case NodeKind.CallExpr: {
         const call = expr as any;
-        if (!call.callee || call.callee.kind !== NodeKind.IdentifierExpr) return null;
+        if (!call.callee) return null;
+        // 数组构造器: type[N](args) 或 type[](args), callee 为 IndexExpr
+        if (call.callee.kind === NodeKind.IndexExpr) {
+          const inner = call.callee.object;
+          if (inner && inner.kind === NodeKind.IdentifierExpr) {
+            const n = inner.name.value;
+            if (ALL_TYPES.includes(n) || this.structs.has(n)) return n;
+          }
+          return null;
+        }
+        if (call.callee.kind !== NodeKind.IdentifierExpr) return null;
         const calleeName = call.callee.name.value;
         // 类型构造器: vec3(...) → vec3
         if (ALL_TYPES.includes(calleeName)) return calleeName;
@@ -980,7 +1024,8 @@ export class Analyzer {
     return sym.kind !== SymbolKind.BuiltinVar &&
            sym.kind !== SymbolKind.BuiltinFunction &&
            sym.kind !== SymbolKind.BuiltinConstant &&
-           sym.kind !== SymbolKind.HintDefined;
+           sym.kind !== SymbolKind.HintDefined &&
+           sym.kind !== SymbolKind.Macro;
   }
 
   private addDiagnostic(token: Token, message: string, severity: 'error' | 'warning' | 'hint'): void {

@@ -57,7 +57,7 @@ export class DocumentManager {
     return info;
   }
 
-  /** 收集 include 文件中的外部符号 */
+  /** 收集 include 文件中的外部符号 (递归: 同时收集嵌套 include 的符号) */
   private collectIncludeSymbols(uri: string, hints: import('../parser/hint-scanner').HintScanResult): Map<string, SymbolInfo> | undefined {
     if (!hints || hints.includes.length === 0) return undefined;
 
@@ -72,17 +72,36 @@ export class DocumentManager {
       }
     } catch { return undefined; }
     if (!docPath) return undefined;
-    const docDir = path.dirname(docPath);
 
     const externalSymbols = new Map<string, SymbolInfo>();
+    const visited = new Set<string>();
+    visited.add(path.normalize(docPath).toLowerCase());
+
+    this.collectIncludesRecursive(docPath, hints, externalSymbols, visited);
+
+    return externalSymbols.size > 0 ? externalSymbols : undefined;
+  }
+
+  /**
+   * 递归收集 include 符号.
+   * @param sourcePath 当前源文件的绝对路径 (作为 include 路径解析基点)
+   * @param hints 当前源文件的 hint 扫描结果
+   * @param externalSymbols 累积的外部符号 (共享引用, 先到先得)
+   * @param visited 已访问的文件绝对路径集合 (小写规范化), 防止循环 include
+   */
+  private collectIncludesRecursive(
+    sourcePath: string,
+    hints: import('../parser/hint-scanner').HintScanResult,
+    externalSymbols: Map<string, SymbolInfo>,
+    visited: Set<string>,
+  ): void {
+    const docDir = path.dirname(sourcePath);
 
     for (const inc of hints.includes) {
       let targetPath: string | null = null;
       if (inc.redirectPath) {
-        // 有 redirection 时, 始终使用重定向路径 (支持所有 include 类型)
         targetPath = path.resolve(docDir, inc.redirectPath);
       } else if (inc.isResPath) {
-        // res:// 路径无 redirection → 跳过
         continue;
       } else if (!inc.isIgnored) {
         targetPath = path.resolve(docDir, inc.path);
@@ -90,14 +109,26 @@ export class DocumentManager {
         continue;
       }
       if (!targetPath) continue;
+
+      // 规范化用于循环检测
+      const key = path.normalize(targetPath).toLowerCase();
+      if (visited.has(key)) continue;
+      visited.add(key);
+
       try {
         if (!fs.existsSync(targetPath)) continue;
         const incText = fs.readFileSync(targetPath, 'utf-8');
         const incResult = parseShader(incText);
         const incAnalyzer = new Analyzer();
         const incAnalysis = incAnalyzer.analyze(incResult.ast, incText);
-        // 将 include 文件路径转为 URI
         const incUri = 'file:///' + targetPath.replace(/\\/g, '/');
+
+        // 1. 先递归处理嵌套的 include, 让更深层的符号也被收集进来
+        if (incAnalysis.hints && incAnalysis.hints.includes.length > 0) {
+          this.collectIncludesRecursive(targetPath, incAnalysis.hints, externalSymbols, visited);
+        }
+
+        // 2. 然后把本文件的符号合并 (先到先得, 不覆盖已有符号)
         for (const [name, sym] of incAnalysis.globalScope.symbols) {
           if (sym.kind === SymbolKind.BuiltinFunction ||
               sym.kind === SymbolKind.BuiltinConstant ||
@@ -105,7 +136,6 @@ export class DocumentManager {
           if (externalSymbols.has(name)) continue;
           // 标记符号的来源文件
           const symCopy = { ...sym, sourceUri: incUri };
-          // 如果是 struct, 也给 members 标记 sourceUri
           if (sym.kind === SymbolKind.Struct && sym.members) {
             symCopy.members = sym.members.map(m => ({ ...m, sourceUri: incUri }));
           }
@@ -115,8 +145,6 @@ export class DocumentManager {
         // 忽略读取/解析错误
       }
     }
-
-    return externalSymbols.size > 0 ? externalSymbols : undefined;
   }
 
   /** 获取文档的缓存信息 (不存在则返回 null) */

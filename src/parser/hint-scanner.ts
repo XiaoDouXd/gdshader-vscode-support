@@ -26,6 +26,19 @@ export interface HintTypeDef {
   typeName: string;
 }
 
+export interface MacroDef {
+  /** 宏名 */
+  name: string;
+  /** 所在行 (0-based) */
+  line: number;
+  /** 是否为函数式宏 (#define FOO(x) ...) */
+  isFunction: boolean;
+  /** 函数式宏的参数名列表 */
+  parameters?: string[];
+  /** 宏体 (已处理续行符, 单行化) */
+  body: string;
+}
+
 export interface HintDef {
   line: number;
   /** 原始定义文本, 如 'vec4 func(float p1, in float x)' */
@@ -46,6 +59,8 @@ export interface HintScanResult {
   includes: IncludeInfo[];
   typeHints: HintTypeDef[];
   defHints: HintDef[];
+  /** 由 #define 声明的宏 */
+  macros: MacroDef[];
   /** 是否存在未 ignored 的 res:// include */
   hasUnresolvedResIncludes: boolean;
 }
@@ -59,10 +74,41 @@ export function scanHints(source: string): HintScanResult {
   const includes: IncludeInfo[] = [];
   const typeHints: HintTypeDef[] = [];
   const defHints: HintDef[] = [];
+  const macros: MacroDef[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const rawLine = lines[i];
+    const line = rawLine.replace(/\r$/, '');
     const trimmed = line.trim();
+
+    // ── #define 检测 (支持多行续行 \) ──
+    const defineMatch = trimmed.match(/^#\s*define\s+(\w+)(.*)$/);
+    if (defineMatch) {
+      const macroName = defineMatch[1];
+      let rest = defineMatch[2];
+      const startLine = i;
+      // 收集续行
+      while (rest.replace(/\r$/, '').endsWith('\\') && i + 1 < lines.length) {
+        // 去掉末尾的 \ (以及可能的 \r), 再拼上下一行
+        rest = rest.replace(/\\\s*\r?$/, ' ');
+        i++;
+        rest += lines[i].replace(/\r$/, '');
+      }
+      rest = rest.replace(/\r$/, '').trim();
+
+      // 函数式宏: #define NAME(a, b) ...
+      let isFunction = false;
+      let parameters: string[] | undefined;
+      let body = rest;
+      const fnMacroMatch = rest.match(/^\(([^)]*)\)\s*(.*)$/);
+      if (fnMacroMatch) {
+        isFunction = true;
+        parameters = fnMacroMatch[1].split(',').map(p => p.trim()).filter(p => p);
+        body = fnMacroMatch[2].trim();
+      }
+      macros.push({ name: macroName, line: startLine, isFunction, parameters, body });
+      continue;
+    }
 
     // ── #include 检测 ──
     const includeMatch = trimmed.match(/^#include\s+"([^"]+)"/);
@@ -109,7 +155,7 @@ export function scanHints(source: string): HintScanResult {
 
   const hasUnresolvedResIncludes = includes.some(inc => inc.isResPath && !inc.isIgnored && !inc.redirectPath);
 
-  return { includes, typeHints, defHints, hasUnresolvedResIncludes };
+  return { includes, typeHints, defHints, macros, hasUnresolvedResIncludes };
 }
 
 /** 检查同行尾部或下一行是否有 #gdshader-hint-ignore */

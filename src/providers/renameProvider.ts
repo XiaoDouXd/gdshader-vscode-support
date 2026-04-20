@@ -38,9 +38,12 @@ export class GDShaderRenameProvider implements vscode.RenameProvider {
       throw new Error(loc('rename.builtinNotAllowed'));
     }
 
-    // HintDefined 符号不可重命名
+    // HintDefined / Macro 符号不可重命名
     if (sym.kind === SymbolKind.HintDefined) {
       throw new Error(loc('rename.hintDeclareNotAllowed'));
+    }
+    if (sym.kind === SymbolKind.Macro) {
+      throw new Error(loc('rename.builtinNotAllowed'));
     }
 
     // 来自 include 文件的符号不可重命名
@@ -72,7 +75,8 @@ export class GDShaderRenameProvider implements vscode.RenameProvider {
         sym.kind === SymbolKind.BuiltinVar ||
         sym.kind === SymbolKind.BuiltinFunction ||
         sym.kind === SymbolKind.BuiltinConstant ||
-        sym.kind === SymbolKind.HintDefined) {
+        sym.kind === SymbolKind.HintDefined ||
+        sym.kind === SymbolKind.Macro) {
       return null;
     }
 
@@ -279,7 +283,7 @@ export class GDShaderRenameProvider implements vscode.RenameProvider {
       case NodeKind.IndexExpr: {
         const idx = expr as any;
         this.collectRefsInExpr(idx.object, name, refs);
-        this.collectRefsInExpr(idx.index, name, refs);
+        if (idx.index) this.collectRefsInExpr(idx.index, name, refs);
         break;
       }
       case NodeKind.MemberExpr:

@@ -1478,5 +1478,119 @@ void fragment() {}`;
   });
 });
 
+describe('Analyzer - 处理器函数禁止 return (Bug 修复)', () => {
+  it('vertex 中出现 return 应报错', () => {
+    const r = analyze(`shader_type spatial;
+void vertex() {
+  return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1, '应报 vertex 中 return 错误');
+  });
+
+  it('fragment 中空 return 应报错', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  if (true) return;
+  ALBEDO = vec3(1.0);
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1, '应报 fragment 中 return 错误');
+  });
+
+  it('light 中带值 return 应报错, 且诊断提示带值', () => {
+    const r = analyze(`shader_type spatial;
+void light() {
+  return 0.0;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('start 中 return 应报错 (particles)', () => {
+    const r = analyze(`shader_type particles;
+void start() {
+  return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('process 中 return 应报错 (particles)', () => {
+    const r = analyze(`shader_type particles;
+void process() {
+  return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('sky 中 return 应报错', () => {
+    const r = analyze(`shader_type sky;
+void sky() {
+  return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('fog 中 return 应报错', () => {
+    const r = analyze(`shader_type fog;
+void fog() {
+  return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('嵌套块中的 return 也应被检测', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  for (int i = 0; i < 10; i++) {
+    if (i > 5) {
+      return;
+    }
+  }
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1, '嵌套 return 应被检测');
+  });
+
+  it('switch 中的 return 也应被检测', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  int x = 1;
+  switch (x) {
+    case 1: return;
+    default: break;
+  }
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 1, 'switch case 中 return 应被检测');
+  });
+
+  it('普通用户函数中的 return 不应报错', () => {
+    const r = analyze(`shader_type spatial;
+float helper(float x) {
+  return x * 2.0;
+}
+void fragment() {
+  float y = helper(1.0);
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.equal(errs.length, 0, '用户函数 return 不应报错');
+  });
+
+  it('多个 return 应各自报错', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  if (true) return;
+  else return;
+}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('return'));
+    assert.ok(errs.length >= 2, '两处 return 都应报错');
+  });
+});
+
 // 运行
 process.exit(summary());

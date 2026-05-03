@@ -18,7 +18,7 @@ import {
 import { Token, TokenRange, TokenType } from './token';
 import {
   BUILTIN_VARS, BUILTIN_FUNCTIONS, BUILTIN_CONSTANTS, CONSTANT_VALUES,
-  ALL_TYPES, PROCESSOR_FUNCTIONS,
+  ALL_TYPES, PROCESSOR_FUNCTIONS, PROCESSOR_FUNCTION_INFO,
 } from '../data';
 import type { BuiltinVariable, BuiltinFunction } from '../data/types';
 import { scanHints, HintScanResult, IncludeInfo, HintDef } from './hint-scanner';
@@ -661,7 +661,63 @@ export class Analyzer {
     // 分析函数体
     this.analyzeBlock(decl.body);
 
+    // 处理器函数禁止 return 检查 (GDShader 中 void 处理器函数不允许出现 return)
+    if (decl.isProcessorFunction) {
+      const info = PROCESSOR_FUNCTION_INFO.find(p => p.name === decl.name.value);
+      if (info && !info.allowReturn) {
+        this.checkReturnInBlock(decl.body, decl.name.value);
+      }
+    }
+
     this.currentScope = prevScope;
+  }
+
+  /** 递归查找块内所有 return 并报诊断 (处理器函数 void, 禁止出现 return). */
+  private checkReturnInBlock(block: BlockStmtNode, fnName: string): void {
+    for (const stmt of block.statements) {
+      this.checkReturnInStmt(stmt, fnName);
+    }
+  }
+
+  private checkReturnInStmt(stmt: Statement, fnName: string): void {
+    if (!stmt) return;
+    switch (stmt.kind) {
+      case NodeKind.ReturnStmt: {
+        const ret = stmt as any;
+        const hasValue = ret.value !== null && ret.value !== undefined;
+        const r = stmt.range;
+        this.addDiagnosticAt(
+          r.start.line, r.start.column,
+          Math.max(1, r.end.offset - r.start.offset),
+          hasValue ? loc('diag.returnValueInProcessor', fnName) : loc('diag.returnInProcessor', fnName),
+          'error',
+        );
+        break;
+      }
+      case NodeKind.BlockStmt:
+        this.checkReturnInBlock(stmt as BlockStmtNode, fnName);
+        break;
+      case NodeKind.IfStmt: {
+        const s = stmt as any;
+        if (s.thenBranch) this.checkReturnInStmt(s.thenBranch, fnName);
+        if (s.elseBranch) this.checkReturnInStmt(s.elseBranch, fnName);
+        break;
+      }
+      case NodeKind.ForStmt:
+      case NodeKind.WhileStmt:
+      case NodeKind.DoWhileStmt: {
+        const s = stmt as any;
+        if (s.body) this.checkReturnInStmt(s.body, fnName);
+        break;
+      }
+      case NodeKind.SwitchStmt: {
+        const s = stmt as any;
+        for (const c of s.cases ?? []) {
+          for (const sub of c.body ?? []) this.checkReturnInStmt(sub, fnName);
+        }
+        break;
+      }
+    }
   }
 
   private analyzeBlock(block: BlockStmtNode): void {

@@ -238,8 +238,39 @@
           "match": "\\b(uniform|global\\s+uniform|instance\\s+uniform|varying|const|flat|smooth|in|out|inout|lowp|mediump|highp)\\b"
         },
         {
-          "name": "support.type.hint.gdshader",
-          "match": ":\\s*(source_color|hint_color|hint_range|hint_normal|hint_default_white|hint_default_black|hint_default_transparent|hint_anisotropy|hint_roughness|hint_roughness_r|hint_roughness_g|hint_roughness_b|hint_roughness_a|hint_roughness_normal|hint_roughness_gray|hint_screen_texture|hint_depth_texture|hint_normal_roughness_texture|hint_enum|filter_nearest|filter_nearest_mipmap|filter_nearest_mipmap_anisotropic|filter_linear|filter_linear_mipmap|filter_linear_mipmap_anisotropic|repeat_enable|repeat_disable|instance_index)\\b"
+          "begin": ":(?=\\s*(?:source_color|hint_color|hint_range|hint_normal|hint_default_white|hint_default_black|hint_default_transparent|hint_anisotropy|hint_roughness|hint_roughness_r|hint_roughness_g|hint_roughness_b|hint_roughness_a|hint_roughness_normal|hint_roughness_gray|hint_screen_texture|hint_depth_texture|hint_normal_roughness_texture|hint_enum|filter_nearest|filter_nearest_mipmap|filter_nearest_mipmap_anisotropic|filter_linear|filter_linear_mipmap|filter_linear_mipmap_anisotropic|repeat_enable|repeat_disable|instance_index)\\b)",
+          "end": "(?=[;=])",
+          "beginCaptures": {
+            "0": { "name": "punctuation.separator.hint.gdshader" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            {
+              "name": "support.type.hint.gdshader",
+              "match": "\\b(source_color|hint_color|hint_range|hint_normal|hint_default_white|hint_default_black|hint_default_transparent|hint_anisotropy|hint_roughness|hint_roughness_r|hint_roughness_g|hint_roughness_b|hint_roughness_a|hint_roughness_normal|hint_roughness_gray|hint_screen_texture|hint_depth_texture|hint_normal_roughness_texture|hint_enum|filter_nearest|filter_nearest_mipmap|filter_nearest_mipmap_anisotropic|filter_linear|filter_linear_mipmap|filter_linear_mipmap_anisotropic|repeat_enable|repeat_disable|instance_index)\\b"
+            },
+            {
+              "name": "string.quoted.double.gdshader",
+              "begin": "\"",
+              "end": "\"",
+              "patterns": [
+                { "match": "\\\\.", "name": "constant.character.escape.gdshader" }
+              ]
+            },
+            { "include": "#numbers" },
+            {
+              "name": "punctuation.separator.comma.gdshader",
+              "match": ","
+            },
+            {
+              "name": "punctuation.section.parens.begin.gdshader",
+              "match": "\\("
+            },
+            {
+              "name": "punctuation.section.parens.end.gdshader",
+              "match": "\\)"
+            }
+          ]
         }
       ]
     },

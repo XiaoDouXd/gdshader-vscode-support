@@ -161,6 +161,8 @@ export class GDShaderDiagnosticsProvider {
         this.checkDiscardInBlock(fn.body, fn.name.value, diagnostics);
       }
 
+      // 4d-2. 处理器函数禁止 return 由 Analyzer 做语义级检查 (见 3. 部分)
+
       // 4e. 内置变量只读检查
       if (fn.body) {
         this.checkBuiltinVarAccessInBlock(fn.body, shaderType, fn.name.value, diagnostics);

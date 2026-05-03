@@ -55,7 +55,7 @@ export interface ProcessorFunctionInfo {
   name: ProcessorFunction;
   /** 该处理器函数属于哪些着色器类型 */
   shaderTypes: ShaderType[];
-  /** 是否允许 return 语句 (处理器函数不允许有返回值, 但允许空 return) */
+  /** 是否允许 return 语句. 处理器函数是 void 类型, 一律不允许 return (含空 return). */
   allowReturn: boolean;
   /** 是否支持 discard */
   allowDiscard: boolean;

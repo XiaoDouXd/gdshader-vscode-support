@@ -55,3 +55,17 @@ export function loc(key: string, ...args: (string | number)[]): string {
   }
   return text;
 }
+
+/**
+ * 尝试获取本地化字符串. 找不到 key 时返回 null (不 fallback 到 key 自身),
+ * 便于调用方判断"是否存在可展示的描述".
+ */
+export function locOptional(key: string, ...args: (string | number)[]): string | null {
+  const text = currentTable[key] ?? en[key];
+  if (text === undefined) return null;
+  let out = text;
+  for (let i = 0; i < args.length; i++) {
+    out = out.replace(`{${i}}`, String(args[i]));
+  }
+  return out;
+}

@@ -6,10 +6,11 @@ import * as vscode from 'vscode';
 import {
   ALL_TYPES, ALL_KEYWORDS,
   BUILTIN_VARS, UNIFORM_HINTS, CONSTANT_VALUES, UNIFORM_HINT_DETAILS,
+  SHADER_TYPES, RENDER_MODES,
 } from '../data';
 import { DocumentManager } from './document-manager';
 import { SymbolKind, SymbolInfo } from '../parser/analyzer';
-import { loc } from '../loc';
+import { loc, locOptional } from '../loc';
 
 export class GDShaderHoverProvider implements vscode.HoverProvider {
 
@@ -36,34 +37,65 @@ export class GDShaderHoverProvider implements vscode.HoverProvider {
       if (hover) return new vscode.Hover(hover, wordRange);
     }
 
-    // 1. 符号表查找
+    // 1. shader_type 值: 同一行以 `shader_type` 开头且 word 是已知 shader 类型
+    if ((SHADER_TYPES as readonly string[]).includes(word) && /^\s*shader_type\b/.test(lineText)) {
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(loc('hover.shaderTypeValue', word));
+      const desc = locOptional(`desc.shaderType.${word}`);
+      if (desc) md.appendMarkdown(`\n\n${desc}`);
+      return new vscode.Hover(md, wordRange);
+    }
+
+    // 2. render_mode 值: 位于当前文档的 render_mode ... ; 声明范围内
+    if (this.isInRenderModeContext(uri, position.line, lineText, wordRange) &&
+        this.isKnownRenderMode(uri, word)) {
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(loc('hover.renderModeValue', word));
+      const desc = locOptional(`desc.renderMode.${word}`);
+      if (desc) md.appendMarkdown(`\n\n${desc}`);
+      return new vscode.Hover(md, wordRange);
+    }
+
+    // 3. 符号表查找
     const sym = this.docManager.resolveSymbol(uri, word, position.line);
     if (sym) {
       const hover = this.hoverForSymbol(sym, document);
       if (hover) return new vscode.Hover(hover, wordRange);
     }
 
-    // 2. 类型
+    // 4. 类型 (带本地化描述)
     if (ALL_TYPES.includes(word)) {
-      return new vscode.Hover(new vscode.MarkdownString(loc('hover.type', word)), wordRange);
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(loc('hover.type', word));
+      const desc = locOptional(`desc.type.${word}`);
+      if (desc) md.appendMarkdown(`\n\n${desc}`);
+      return new vscode.Hover(md, wordRange);
     }
 
-    // 3. 关键字
+    // 5. 关键字 (带本地化描述)
     if (ALL_KEYWORDS.includes(word)) {
-      return new vscode.Hover(new vscode.MarkdownString(loc('hover.keyword', word)), wordRange);
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(loc('hover.keyword', word));
+      const desc = locOptional(`desc.keyword.${word}`);
+      if (desc) md.appendMarkdown(`\n\n${desc}`);
+      return new vscode.Hover(md, wordRange);
     }
 
-    // 4. Uniform 提示
+    // 6. Uniform 提示
     if ((UNIFORM_HINTS as readonly string[]).includes(word)) {
       const detail = UNIFORM_HINT_DETAILS.find(h => h.name === word);
-      const desc = detail ? `\n\n${detail.description}\n\n${loc('hover.uniformHint.applicableTypes', detail.applicableTypes.join(', '))}` : '';
-      return new vscode.Hover(
-        new vscode.MarkdownString(`${loc('hover.uniformHint', word)}${desc}`),
-        wordRange
-      );
+      const localizedDesc = locOptional(`desc.uniformHint.${word}`) ?? detail?.description ?? '';
+      const applicable = detail
+        ? `\n\n${loc('hover.uniformHint.applicableTypes', detail.applicableTypes.join(', '))}`
+        : '';
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(loc('hover.uniformHint', word));
+      if (localizedDesc) md.appendMarkdown(`\n\n${localizedDesc}`);
+      md.appendMarkdown(applicable);
+      return new vscode.Hover(md, wordRange);
     }
 
-    // 5. 跨上下文的内置变量提示
+    // 7. 跨上下文的内置变量提示
     const shaderType = this.docManager.getShaderType(uri);
     const currentFn = this.docManager.getProcessorFunctionAt(uri, position.line);
     const allVars = BUILTIN_VARS[shaderType];
@@ -82,6 +114,46 @@ export class GDShaderHoverProvider implements vscode.HoverProvider {
     }
 
     return null;
+  }
+
+  /**
+   * 判断当前 word 是否位于某个 `render_mode ... ;` 声明的范围内.
+   * render_mode 可跨多行, 这里采用简单的向上回溯: 从当前行往上查找最近的 `render_mode`,
+   * 在遇到未匹配的 `;` 前能找到则认为位于其中.
+   */
+  private isInRenderModeContext(
+    uri: string, line: number, lineText: string, wordRange: vscode.Range,
+  ): boolean {
+    // 先快速判断: 同行以 render_mode 开头, 且 word 在关键字之后
+    if (/^\s*render_mode\b/.test(lineText)) {
+      const kwIdx = lineText.indexOf('render_mode');
+      if (wordRange.start.character > kwIdx) {
+        // 确保光标在 ";" 之前
+        const semi = lineText.indexOf(';');
+        if (semi === -1 || wordRange.start.character < semi) return true;
+      }
+    }
+    // 多行: 向上最多 8 行寻找未闭合的 `render_mode`
+    const info = this.docManager.get(uri);
+    if (!info) return false;
+    const doc = info.result.ast;
+    if (doc.renderMode && line >= doc.renderMode.range.start.line && line <= doc.renderMode.range.end.line) {
+      // word 必须不是 `render_mode` 关键字本身
+      return true;
+    }
+    return false;
+  }
+
+  /** 判断 word 是否是当前 shader_type 允许的 render_mode 值 (任意 shader type 的也接受). */
+  private isKnownRenderMode(uri: string, word: string): boolean {
+    const st = this.docManager.getShaderType(uri);
+    const modes = RENDER_MODES[st] ?? [];
+    if (modes.includes(word)) return true;
+    // 若不匹配当前 shader type, 仍尝试在所有 RENDER_MODES 中查找, 便于在输入阶段给出提示
+    for (const key of Object.keys(RENDER_MODES)) {
+      if (RENDER_MODES[key].includes(word)) return true;
+    }
+    return false;
   }
 
   /** struct 成员的 hover: obj.field → 显示 field 类型和注释 */

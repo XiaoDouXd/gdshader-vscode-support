@@ -368,4 +368,60 @@ describe('后续语法匹配规则', () => {
   });
 });
 
+// ─── 本地化描述完整性 ───
+
+describe('本地化描述 (Bug 修复: 内建关键字悬停本地化)', () => {
+  const { locOptional } = require('../src/loc');
+
+  it('每种 shader_type 都应有中/英描述', () => {
+    for (const st of SHADER_TYPES) {
+      const desc = locOptional(`desc.shaderType.${st}`);
+      assert.ok(desc !== null && desc.length > 0, `shader_type ${st} 缺少描述`);
+    }
+  });
+
+  it('每个类型都应有中/英描述', () => {
+    for (const t of ALL_TYPES) {
+      const desc = locOptional(`desc.type.${t}`);
+      assert.ok(desc !== null && desc.length > 0, `类型 ${t} 缺少描述`);
+    }
+  });
+
+  it('所有关键字 (除 true/false 文字字面量外) 都应有中/英描述', () => {
+    for (const kw of ALL_KEYWORDS) {
+      const desc = locOptional(`desc.keyword.${kw}`);
+      assert.ok(desc !== null && desc.length > 0, `关键字 ${kw} 缺少描述`);
+    }
+  });
+
+  it('每个 uniform hint 都应有中/英描述', () => {
+    for (const hint of UNIFORM_HINTS) {
+      const desc = locOptional(`desc.uniformHint.${hint}`);
+      assert.ok(desc !== null && desc.length > 0, `uniform hint ${hint} 缺少描述`);
+    }
+  });
+
+  it('uniform_hint 规则应匹配多 hint 场景 (Bug 修复)', () => {
+    const rule = SYNTAX_FOLLOW_RULES.find(r => r.trigger === 'uniform_hint')!;
+    // 基础: ": "
+    assert.ok(rule.triggerPattern.test('uniform vec4 c : '), '空 hint 段应触发');
+    // 正在输入首个 hint
+    assert.ok(rule.triggerPattern.test('uniform vec4 c : hint'), '第一个 hint 应触发');
+    // 已有首个 hint, 后续逗号
+    assert.ok(rule.triggerPattern.test('uniform vec4 c : source_color, '), '逗号后应触发');
+    // 已有带参数的 hint, 后续逗号
+    assert.ok(rule.triggerPattern.test('uniform float x : hint_range(0, 1), '), '带参数 hint 后的逗号也应触发');
+    // 已输入第二个 hint 的前缀
+    assert.ok(rule.triggerPattern.test('uniform float x : hint_range(0, 1), filter_'), '正在输入第二个 hint 也应触发');
+    // 在 "=" 之后不应触发 (默认值段)
+    assert.ok(!rule.triggerPattern.test('uniform float x : hint_range(0, 1) = 0.5'), '= 后不应触发');
+  });
+
+  it('所有处理器函数均禁止 return (Bug 修复)', () => {
+    for (const p of PROCESSOR_FUNCTION_INFO) {
+      assert.equal(p.allowReturn, false, `${p.name} 应禁止 return`);
+    }
+  });
+});
+
 process.exit(summary());

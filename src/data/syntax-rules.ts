@@ -9,49 +9,49 @@ export const PROCESSOR_FUNCTION_INFO: ProcessorFunctionInfo[] = [
   {
     name: 'vertex',
     shaderTypes: ['spatial', 'canvas_item'],
-    allowReturn: true,  // 允许空 return, 不允许带值 return
+    allowReturn: false,
     allowDiscard: false,
     description: '顶点处理器函数, 处理顶点变换.',
   },
   {
     name: 'fragment',
     shaderTypes: ['spatial', 'canvas_item'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: true,
     description: '片段处理器函数, 设置材质属性.',
   },
   {
     name: 'light',
     shaderTypes: ['spatial', 'canvas_item'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: true,
     description: '光照处理器函数, 自定义光照计算.',
   },
   {
     name: 'start',
     shaderTypes: ['particles'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: false,
     description: '粒子初始化处理器函数.',
   },
   {
     name: 'process',
     shaderTypes: ['particles'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: false,
     description: '粒子更新处理器函数.',
   },
   {
     name: 'sky',
     shaderTypes: ['sky'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: false,
     description: '天空处理器函数.',
   },
   {
     name: 'fog',
     shaderTypes: ['fog'],
-    allowReturn: true,
+    allowReturn: false,
     allowDiscard: false,
     description: '雾效处理器函数.',
   },
@@ -120,11 +120,13 @@ export const SYNTAX_FOLLOW_RULES: SyntaxFollowRule[] = [
   },
   {
     trigger: 'uniform_hint',
-    triggerPattern: /uniform\s+\w+\s+\w+\s*:\s*\w*$/,
+    // 位于 uniform 声明的 hint 段: 首次 `:` 之后, 直到 `=` 或 `;` 之前.
+    // 既匹配首个 hint `uniform X Y : |`, 也匹配后续 `uniform X Y : ha, |` / `uniform X Y : ha(0), |`.
+    triggerPattern: /\buniform\s+\w+\s+\w+\s*(?:\[[^\]]*\])?\s*:\s*[^=;]*$/,
     followKind: 'uniform_hint',
     filterByShaderType: false,
     filterByProcessorFn: false,
-    description: 'uniform 声明中 ":" 后面跟 hint.',
+    description: 'uniform 声明 hint 段 (冒号之后) 的补全, 支持多 hint.',
   },
   {
     trigger: 'type_declaration',

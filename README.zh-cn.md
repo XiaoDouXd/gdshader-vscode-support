@@ -87,6 +87,7 @@
 | **重定向** | `// #gdshader-hint-redirection:./相对路径` | 写在 `res://` 路径的 `#include` **同行或下一行**，将 Godot 资源路径重定向为本地相对路径，使扩展能正确解析 |
 | **类型提示** | `// #gdshader-hint-type:vec3`<br>`/* #gdshader-hint-type:vec3 */` | 为**前一个变量声明**指定类型。适用于类型无法自动推断的场景（如外部函数返回值） |
 | **声明符号** | `// #gdshader-hint-declare:vec4 my_func(float p1, in float x);`<br>或<br>`// #gdshader-hint-declare:float MY_VAR;` | 向当前作用域注入一个**函数或变量定义**。支持函数（含参数）和简单变量。旧名称 `#gdshader-hint-def` 同样兼容 |
+| **声明宏** | `// #gdshader-hint-define:MY_FLAG`<br>`// #gdshader-hint-define:SQR(x) ((x)*(x))` | 声明一个宏符号（等价于 `#define`）。用于外部预定义（如由 Godot 引擎在编译时注入）的宏，让分析器识别它们 |
 
 ### 使用示例
 
@@ -103,9 +104,51 @@ var custom_data = get_custom_data(); // #gdshader-hint-type:vec3
 
 // ── 声明一个变量 ──
 // #gdshader-hint-declare:float GLOBAL_SCALE;
+
+// ── 声明宏 ──
+// #gdshader-hint-define:MAX_STEPS 64
+// #gdshader-hint-define:SQR(x) ((x)*(x))
 ```
 
 > **说明：** 所有 hint 注释均支持行注释（`// ...`）和块注释（`/* ... */`）两种写法。对于 `#gdshader-hint-ignore` 和 `#gdshader-hint-redirection`，注释可写在 `#include` 的**行尾**或**下一行**。
+
+### 条件编译块
+
+插件会识别 `#ifdef` / `#ifndef` / `#if` / `#elif` / `#else` / `#endif` 指令，并提供以下检查：
+
+- **配对检查**：未闭合的 `#ifdef` / `#ifndef` / `#if`，或孤立的 `#else` / `#elif` / `#endif` 会被报错
+- **顺序检查**：`#elif` 不能出现在 `#else` 之后；同一条件块内不能有多个 `#else`
+- **符号提取**：即使 `#define` 写在 `#ifdef` 内部，宏仍会被分析器识别为可用符号（插件不进行条件求值）
+
+```glsl
+#ifdef USE_HQ
+#define SAMPLES 16
+#else
+#define SAMPLES 4
+#endif
+
+void fragment() {
+  for (int i = 0; i < SAMPLES; i++) { /* ... */ }
+}
+```
+
+### 文档注释
+
+插件同时支持两种 Doxygen 风格的文档注释，写在函数声明之上会在悬停提示中自动渲染：
+
+- `///` 连续行注释
+- `/** ... */` 块注释
+
+支持的标签：`@param`、`@return`、`@brief`、`@note`、`@warning`、`@see`、`@deprecated`、`@throws`、`@since`、`@author`、`@version`。
+
+```glsl
+/**
+ * 计算向量长度的平方。
+ * @param v 输入向量
+ * @return 长度的平方
+ */
+float len_sq(vec3 v) { return dot(v, v); }
+```
 
 ## 🚀 快速开始
 

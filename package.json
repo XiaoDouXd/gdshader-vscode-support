@@ -3,7 +3,7 @@
   "icon": "./icons/extension-icon.png",
   "displayName": "GDShader Support",
   "description": "GDShader (Godot 着色语言) VS Code 支持 - 语法高亮, 代码补全, 语法检查, 实用工具等.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "xiaodouxd",
   "license": "MIT",
   "engines": {

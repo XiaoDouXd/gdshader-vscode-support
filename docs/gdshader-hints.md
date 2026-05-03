@@ -8,7 +8,8 @@ GDShader Support 插件提供了一组特殊注释标记 (`#gdshader-hint-*`), �
 |---|---|---|
 | `#gdshader-hint-ignore` | 忽略 `#include` 诊断 | `#include` 同行尾部或下一行 |
 | `#gdshader-hint-redirection:路径` | 重定向 `res://` include 到本地路径 | `#include` 同行尾部或下一行 |
-| `#gdshader-hint-def:定义` | 注入符号定义 (变量/函数) | 任意位置 (通常紧随 `#include` 之后) |
+| `#gdshader-hint-def:定义` / `#gdshader-hint-declare:定义` | 注入符号定义 (变量/函数) | 任意位置 (通常紧随 `#include` 之后) |
+| `#gdshader-hint-define:宏定义` | 声明宏 (等价于 `#define`) | 任意位置 |
 | `#gdshader-hint-type:类型` | 为变量指定类型 | 变量声明的同行或上一行 |
 
 ---
@@ -111,6 +112,77 @@ float x;
 
 // 块注释形式 (同行的变量)
 float x; /* #gdshader-hint-type:mat4 */
+```
+
+---
+
+## `#gdshader-hint-define:宏定义`
+
+**作用**: 声明一个宏符号. 等价于向分析器注入一个 `#define`, 用于外部预定义的宏(如编译时由 Godot 引擎注入).
+
+**效果**:
+- 被声明的宏可被补全/悬停识别
+- 不再报未定义标识符警告
+- 不参与重复定义检查
+
+**写法**:
+
+```gdshader
+// 常量宏
+// #gdshader-hint-define:MAX_STEPS 64
+
+// 函数式宏
+// #gdshader-hint-define:SQR(x) ((x)*(x))
+
+// 块注释形式
+/* #gdshader-hint-define:MY_FLAG */
+```
+
+---
+
+## 条件编译块 (`#ifdef`/`#if`/`#elif`/`#else`/`#endif`)
+
+插件会识别 `#ifdef`, `#ifndef`, `#if`, `#elif`, `#else`, `#endif` 指令, 并做以下检查:
+
+- **配对检查**: 未闭合的 `#ifdef`/`#ifndef`/`#if` 或孤立的 `#else`/`#elif`/`#endif` 会被报错
+- **顺序检查**: `#elif` 不能出现在 `#else` 之后; 同一块内不能有多个 `#else`
+- **符号提取**: 即使 `#define` 写在 `#ifdef` 内部, 宏仍会被分析器提取为可用符号 (插件不进行条件求值)
+
+示例:
+
+```gdshader
+#ifdef USE_HQ
+#define SAMPLES 16
+#else
+#define SAMPLES 4
+#endif
+
+void fragment() {
+  for (int i = 0; i < SAMPLES; i++) { /* ... */ }
+}
+```
+
+---
+
+## 文档注释
+
+插件同时支持两种 Doxygen 风格的文档注释, 置于函数声明之上会在悬停提示中显示:
+
+- `///` 连续行注释
+- `/** ... */` 块注释
+
+支持的标签: `@param`, `@return`, `@brief`, `@note`, `@warning`, `@see`, `@deprecated`, `@throws`, `@since`, `@author`, `@version`.
+
+```gdshader
+/**
+ * 计算两个向量的混合.
+ * @param a 第一个向量
+ * @param b 第二个向量
+ * @return 混合结果
+ */
+vec3 my_blend(vec3 a, vec3 b) {
+  return mix(a, b, 0.5);
+}
 ```
 
 ---

@@ -87,6 +87,7 @@ This extension supports **special hint comments** to help the analyzer understan
 | **Redirection** | `// #gdshader-hint-redirection:./relative/path` | Placed **on the same line or next line** after a `res://` `#include`. Redirects the Godot resource path to a local relative path so the extension can resolve it. |
 | **Type Hint** | `// #gdshader-hint-type:vec3`<br>`/* #gdshader-hint-type:vec3 */` | Specifies the type of the **preceding variable declaration**. Useful when the type cannot be inferred automatically (e.g., external function return values). |
 | **Declare Symbol** | `// #gdshader-hint-declare:vec4 my_func(float p1, in float x);`<br>or<br>`// #gdshader-hint-declare:float MY_VAR;` | Injects a **function or variable symbol** into the current scope. Supports both functions (with parameters) and simple variables. The legacy alias `#gdshader-hint-def` is also supported. |
+| **Declare Macro** | `// #gdshader-hint-define:MY_FLAG`<br>`// #gdshader-hint-define:SQR(x) ((x)*(x))` | Declares a macro symbol (equivalent to `#define`). Useful when a macro is defined externally but needs to be recognized by the analyzer. |
 
 ### Usage Examples
 
@@ -103,9 +104,26 @@ var custom_data = get_custom_data(); // #gdshader-hint-type:vec3
 
 // ── Declare a variable ──
 // #gdshader-hint-declare:float GLOBAL_SCALE;
+
+// ── Declare a macro ──
+// #gdshader-hint-define:MAX_STEPS 64
+// #gdshader-hint-define:SQR(x) ((x)*(x))
 ```
 
 > **Note:** All hints can use either line comments (`// ...`) or block comments (`/* ... */`). For `#gdshader-hint-ignore` and `#gdshader-hint-redirection`, the hint can appear at the **end of the `#include` line** or on the **next line**.
+
+### Doc Comments
+
+Both `///` line doc comments and `/** ... */` block doc comments on the line(s) immediately above a function declaration are picked up and shown in the hover tooltip. Supported tags include `@param`, `@return`, `@brief`, etc.
+
+```glsl
+/**
+ * Computes the squared length of a vector.
+ * @param v input vector
+ * @return length squared
+ */
+float len_sq(vec3 v) { return dot(v, v); }
+```
 
 ## 🚀 Quick Start
 

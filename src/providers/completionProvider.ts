@@ -41,13 +41,13 @@ export class GDShaderCompletionProvider implements vscode.CompletionItemProvider
     // #include 指令补全: 检测 #include 行
     const includePathMatch = linePrefix.match(/^#include\s+"([^"]*)$/);
     if (includePathMatch) {
-      return this.getIncludePathCompletions(document, includePathMatch[1]);
+      return this.getIncludePathCompletions(document, includePathMatch[1], position);
     }
 
     // #gdshader-hint-redirection 路径补全
     const redirPathMatch = linePrefix.match(/#gdshader-hint-redirection\s*:\s*(\S*)$/);
     if (redirPathMatch) {
-      return this.getIncludePathCompletions(document, redirPathMatch[1]);
+      return this.getIncludePathCompletions(document, redirPathMatch[1], position);
     }
 
     // #gdshader-hint- 注释补全
@@ -202,28 +202,50 @@ export class GDShaderCompletionProvider implements vscode.CompletionItemProvider
     });
   }
 
-  /** #include 路径补全: 列出当前目录下的 .gdshaderinc 文件 */
-  private getIncludePathCompletions(document: vscode.TextDocument, currentPath: string): vscode.CompletionItem[] {
+  /**
+   * 路径补全: 根据已输入路径前缀 currentPath 列出对应目录内的 .gdshader / .gdshaderinc 文件.
+   *
+   * 基准目录: 始终是当前文件所在目录 (document.uri.fsPath 的 dirname).
+   * 支持 `./`, `../` 相对前缀.
+   *
+   * 关键点:
+   * - 当 currentPath 含有 `/` 时, 仅替换最后一个 `/` 之后的文件名部分,
+   *   以避免 VS Code 默认的 "word" 替换范围把 `./` 或 `../` 这类前缀吃掉或重复.
+   * - 当 currentPath 不含 `/` 时, 替换整个已输入的前缀文本.
+   */
+  private getIncludePathCompletions(
+    document: vscode.TextDocument,
+    currentPath: string,
+    position: vscode.Position,
+  ): vscode.CompletionItem[] {
     const items: vscode.CompletionItem[] = [];
     try {
       const docDir = path.dirname(document.uri.fsPath);
-      // 如果 currentPath 有目录部分, 拼上
-      const targetDir = currentPath.includes('/')
-        ? path.resolve(docDir, path.dirname(currentPath))
-        : docDir;
+      // 分离已输入路径的目录前缀和正在输入的文件名部分
+      const lastSlash = currentPath.lastIndexOf('/');
+      const dirPart = lastSlash >= 0 ? currentPath.substring(0, lastSlash + 1) : '';
+      const namePart = lastSlash >= 0 ? currentPath.substring(lastSlash + 1) : currentPath;
+      const targetDir = dirPart ? path.resolve(docDir, dirPart) : docDir;
       if (!fs.existsSync(targetDir)) return items;
+
+      // 替换范围: 仅覆盖 namePart 部分, 避免破坏 ./ 或 ../ 前缀
+      const replaceStart = new vscode.Position(position.line, position.character - namePart.length);
+      const replaceRange = new vscode.Range(replaceStart, position);
+
       const entries = fs.readdirSync(targetDir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const item = new vscode.CompletionItem(entry.name, vscode.CompletionItemKind.Folder);
           item.detail = loc('completion.folder');
           item.insertText = entry.name + '/';
+          item.range = replaceRange;
           item.command = { command: 'editor.action.triggerSuggest', title: '' };
           items.push(item);
         } else if (entry.name.endsWith('.gdshaderinc') || entry.name.endsWith('.gdshader')) {
           const item = new vscode.CompletionItem(entry.name, vscode.CompletionItemKind.File);
           item.detail = entry.name.endsWith('.gdshaderinc') ? 'GDShader Include' : 'GDShader';
           item.insertText = entry.name;
+          item.range = replaceRange;
           items.push(item);
         }
       }
@@ -238,6 +260,7 @@ export class GDShaderCompletionProvider implements vscode.CompletionItemProvider
     const hints = [
       { label: '#gdshader-hint-ignore', detail: loc('completion.hint.ignore'), snippet: '#gdshader-hint-ignore' },
       { label: '#gdshader-hint-declare:', detail: loc('completion.hint.declare'), snippet: '#gdshader-hint-declare:${1:type} ${2:name}' },
+      { label: '#gdshader-hint-define:', detail: loc('completion.hint.define'), snippet: '#gdshader-hint-define:${1:NAME}' },
       { label: '#gdshader-hint-type:', detail: loc('completion.hint.type'), snippet: '#gdshader-hint-type:${1:type}' },
       { label: '#gdshader-hint-redirection:', detail: loc('completion.hint.redirection'), snippet: '#gdshader-hint-redirection:${1:./path}' },
     ];

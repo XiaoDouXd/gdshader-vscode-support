@@ -62,6 +62,7 @@ export const zhCN: LocaleTable = {
   'completion.folder': '目录',
   'completion.hint.ignore': '忽略此 #include 的诊断提示',
   'completion.hint.declare': '注入符号定义 (变量或函数)',
+  'completion.hint.define': '声明一个宏 (等价于 #define, 仅供分析器使用)',
   'completion.hint.type': '为前一个变量指定类型',
   'completion.hint.redirection': '将 include 重定向到相对路径',
   'completion.shaderType': '着色器类型: {0}',
@@ -91,6 +92,12 @@ export const zhCN: LocaleTable = {
   'analyzer.typeMismatch': '类型不匹配: 不能将 "{0}" 赋给 "{1}".',
   'analyzer.argCount': '函数 "{0}" 需要 {1} 个参数, 但传入了 {2} 个.',
   'analyzer.argTypeMismatch': '参数 "{0}" 类型不匹配: 需要 "{1}", 但传入 "{2}".',
+  'analyzer.cond.strayElif': '孤立的 #elif: 缺少对应的 #if/#ifdef/#ifndef.',
+  'analyzer.cond.strayElse': '孤立的 #else: 缺少对应的 #if/#ifdef/#ifndef.',
+  'analyzer.cond.strayEndif': '孤立的 #endif: 缺少对应的 #if/#ifdef/#ifndef.',
+  'analyzer.cond.duplicateElse': '同一条件块内出现多个 #else.',
+  'analyzer.cond.elifAfterElse': '#elif 不能出现在 #else 之后.',
+  'analyzer.cond.unclosed': '{0} 缺少对应的 #endif.',
 
   // ── parser.ts ──
   'parser.unexpectedToken': "不期望的 token '{0}'.",

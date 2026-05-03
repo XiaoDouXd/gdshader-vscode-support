@@ -18,6 +18,11 @@ export class Parser {
   private tokens: Token[] = [];
   private pos = 0;
   readonly diagnostics: ParserDiagnostic[] = [];
+  /**
+   * 用于支持逗号分隔的多变量声明 (如 `float a, b, c;`).
+   * 解析单个变量节点时, 其余的节点临时放到这里, 由调用方 (parseBlock/parseTopLevelDecl) 展开.
+   */
+  private pendingVarDecls: AST.VariableDeclNode[] = [];
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -27,6 +32,7 @@ export class Parser {
   parse(): AST.ShaderFileNode {
     this.pos = 0;
     this.diagnostics.length = 0;
+    this.pendingVarDecls.length = 0;
 
     let shaderType: AST.ShaderTypeDeclNode | null = null;
     let renderMode: AST.RenderModeDeclNode | null = null;
@@ -48,6 +54,11 @@ export class Parser {
       const prevPos = this.pos;
       const decl = this.parseTopLevelDecl();
       if (decl) declarations.push(decl);
+      // 吸收逗号分隔的多变量声明产生的额外节点
+      if (this.pendingVarDecls.length > 0) {
+        declarations.push(...this.pendingVarDecls);
+        this.pendingVarDecls.length = 0;
+      }
       // 安全保障: 如果 pos 没有前进, 强制跳过一个 token 防止死循环
       if (this.pos === prevPos && !this.isAtEnd()) {
         this.advance();
@@ -155,23 +166,43 @@ export class Parser {
     this.expect(TokenType.LBrace);
     const members: AST.StructMemberNode[] = [];
     while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
-      members.push(this.parseStructMember());
+      this.parseStructMember(members);
     }
     this.expect(TokenType.RBrace);
     this.expect(TokenType.Semicolon);
     return { kind: NodeKind.StructDecl, range: tokenRange(start, this.prev()), name, members };
   }
 
-  private parseStructMember(): AST.StructMemberNode {
+  private parseStructMember(out: AST.StructMemberNode[]): void {
     const type = this.parseTypeRef();
-    const name = this.expect(TokenType.Identifier);
-    let arraySize: AST.Expression | null = null;
+    // 首个成员
+    const firstName = this.expect(TokenType.Identifier);
+    let firstArraySize: AST.Expression | null = null;
     if (this.match(TokenType.LBracket)) {
-      if (!this.check(TokenType.RBracket)) arraySize = this.parseExpression();
+      if (!this.check(TokenType.RBracket)) firstArraySize = this.parseExpression();
       this.expect(TokenType.RBracket);
     }
+    out.push({
+      kind: NodeKind.StructMember,
+      range: tokenRange(type.typeName, this.prev()),
+      type, name: firstName, arraySize: firstArraySize,
+    });
+    // 逗号分隔的多成员: `vec3 a, b, c[3];`
+    while (this.match(TokenType.Comma)) {
+      if (!this.check(TokenType.Identifier)) break;
+      const extraName = this.advance();
+      let extraArraySize: AST.Expression | null = null;
+      if (this.match(TokenType.LBracket)) {
+        if (!this.check(TokenType.RBracket)) extraArraySize = this.parseExpression();
+        this.expect(TokenType.RBracket);
+      }
+      out.push({
+        kind: NodeKind.StructMember,
+        range: tokenRange(extraName, this.prev()),
+        type, name: extraName, arraySize: extraArraySize,
+      });
+    }
     this.expect(TokenType.Semicolon);
-    return { kind: NodeKind.StructMember, range: tokenRange(type.range.start as any as Token, this.prev()), type, name, arraySize };
   }
 
   private parseUniformDecl(qualifiers: Token[]): AST.UniformDeclNode {
@@ -332,6 +363,11 @@ export class Parser {
     while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
       const stmt = this.parseStatement();
       if (stmt) statements.push(stmt);
+      // 吸收逗号分隔的多变量声明产生的额外节点
+      if (this.pendingVarDecls.length > 0) {
+        statements.push(...this.pendingVarDecls);
+        this.pendingVarDecls.length = 0;
+      }
     }
     this.expect(TokenType.RBrace);
     return { kind: NodeKind.BlockStmt, range: tokenRange(start, this.prev()), statements };
@@ -455,6 +491,31 @@ export class Parser {
     if (this.match(TokenType.Assign)) {
       initializer = this.parseExpression();
     }
+
+    // 多变量声明: `Type a, b = 1, c[3];`
+    // 解析并把额外的变量放入 pendingVarDecls, 供上层展开
+    while (this.match(TokenType.Comma)) {
+      if (!this.check(TokenType.Identifier)) break;
+      const extraName = this.advance();
+      let extraArraySize: AST.Expression | null = null;
+      if (this.match(TokenType.LBracket)) {
+        if (!this.check(TokenType.RBracket)) extraArraySize = this.parseExpression();
+        this.expect(TokenType.RBracket);
+      }
+      let extraInit: AST.Expression | null = null;
+      if (this.match(TokenType.Assign)) {
+        extraInit = this.parseExpression();
+      }
+      this.pendingVarDecls.push({
+        kind: NodeKind.VariableDecl,
+        range: tokenRange(extraName, this.prev()),
+        isConst, precision, type,
+        name: extraName,
+        arraySize: extraArraySize,
+        initializer: extraInit,
+      });
+    }
+
     this.expect(TokenType.Semicolon);
     return {
       kind: NodeKind.VariableDecl,
@@ -489,6 +550,8 @@ export class Parser {
     if (!this.check(TokenType.Semicolon)) {
       if (this.isVarDeclStart() || this.check(TokenType.KwConst)) {
         init = this.parseVariableDecl(this.check(TokenType.KwConst));
+        // for 的 init 中不支持多变量展开, 丢弃额外声明 (避免污染 pending 队列)
+        this.pendingVarDecls.length = 0;
       } else {
         init = this.parseExpressionStmt();
       }

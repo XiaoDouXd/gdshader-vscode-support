@@ -5,6 +5,7 @@
 import { describe, it, assert, summary } from './harness';
 import { parseShader } from '../src/parser/document-cache';
 import { Analyzer, SymbolKind, Scope } from '../src/parser/analyzer';
+import { NodeKind } from '../src/parser/ast';
 
 // ═══════════════════════════════════════════
 // 辅助函数
@@ -1240,6 +1241,240 @@ void fragment() {
     assert.equal(sym!.kind, SymbolKind.Macro);
     const undefs = r.diagnostics.filter(d => d.message.includes('未定义') && d.message.includes('WRAP'));
     assert.equal(undefs.length, 0, '不应报多行宏 WRAP 未定义');
+  });
+});
+
+// ═══════════════════════════════════════════
+// 新增 Bug 修复回归测试
+// ═══════════════════════════════════════════
+
+describe('Parser - 逗号分隔的多变量声明 (Bug 修复)', () => {
+  it('全局多变量声明 `const float a, b = 1.0, c;` 应展开为多个 VariableDecl', () => {
+    const r = parseShader(`shader_type spatial;
+const float a, b = 1.0, c;
+void fragment() {}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+    const varDecls = r.ast.declarations.filter((d: any) => d.kind === NodeKind.VariableDecl);
+    assert.equal(varDecls.length, 3, '应展开为 3 个变量声明');
+    assert.equal((varDecls[0] as any).name.value, 'a');
+    assert.equal((varDecls[1] as any).name.value, 'b');
+    assert.equal((varDecls[2] as any).name.value, 'c');
+  });
+
+  it('函数内多变量声明 `float a, b;` 应展开为多个 VariableDecl', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  float a, b;
+  a = 1.0;
+  b = 2.0;
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+    const fn = r.ast.declarations[0] as any;
+    const stmts = fn.body.statements;
+    // 前两个应是 a, b 的声明
+    assert.equal(stmts[0].kind, NodeKind.VariableDecl);
+    assert.equal(stmts[0].name.value, 'a');
+    assert.equal(stmts[1].kind, NodeKind.VariableDecl);
+    assert.equal(stmts[1].name.value, 'b');
+  });
+
+  it('多变量声明包含数组与初始化 `int a[3] = {1,2,3}, b, c = 5;`', () => {
+    const r = parseShader(`shader_type spatial;
+void fragment() {
+  int a[3] = {1, 2, 3}, b, c = 5;
+}`);
+    assert.equal(r.parserDiagnostics.length, 0,
+      '不应有解析错误: ' + r.parserDiagnostics.map(d => d.message).join('; '));
+    const fn = r.ast.declarations[0] as any;
+    assert.equal(fn.body.statements.length, 3);
+    assert.equal(fn.body.statements[0].name.value, 'a');
+    assert.ok(fn.body.statements[0].arraySize !== null);
+    assert.equal(fn.body.statements[1].name.value, 'b');
+    assert.equal(fn.body.statements[2].name.value, 'c');
+    assert.ok(fn.body.statements[2].initializer !== null);
+  });
+
+  it('struct 内 `vec3 a, b;` 应展开为多个成员', () => {
+    const r = parseShader(`shader_type spatial;
+struct S {
+  vec3 a, b;
+  float c;
+};
+void fragment() {}`);
+    assert.equal(r.parserDiagnostics.length, 0);
+    const s = r.ast.declarations[0] as any;
+    assert.equal(s.members.length, 3);
+    assert.equal(s.members[0].name.value, 'a');
+    assert.equal(s.members[1].name.value, 'b');
+    assert.equal(s.members[2].name.value, 'c');
+  });
+
+  it('Analyzer: 多变量声明后每个变量都应可 resolve', () => {
+    const r = analyze(`shader_type spatial;
+void fragment() {
+  float a, b = 2.0, c;
+  ALBEDO = vec3(a + b + c);
+}`);
+    const scope = Analyzer.findScopeAtLine(r.globalScope, 3);
+    assert.ok(scope.resolve('a') !== undefined);
+    assert.ok(scope.resolve('b') !== undefined);
+    assert.ok(scope.resolve('c') !== undefined);
+    const undefs = r.diagnostics.filter(d => d.message.includes('未定义'));
+    assert.equal(undefs.length, 0, '不应报未定义 (got: ' + undefs.map(u => u.message).join('; ') + ')');
+  });
+});
+
+describe('HintScanner - 条件编译块识别 (#ifdef/#else/#elif)', () => {
+  it('应识别 #ifdef/#endif 并配对', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#ifdef DEBUG
+float x = 1.0;
+#endif
+`);
+    assert.equal(r.conditionals.length, 2);
+    assert.equal(r.conditionals[0].kind, 'ifdef');
+    assert.equal(r.conditionals[0].condition, 'DEBUG');
+    assert.equal(r.conditionals[1].kind, 'endif');
+    assert.equal(r.conditionals[0].endifLine, 2);
+  });
+
+  it('应识别 #if/#elif/#else/#endif 完整链', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#if COND_A
+a();
+#elif COND_B
+b();
+#else
+c();
+#endif`);
+    assert.equal(r.conditionals.length, 4);
+    assert.equal(r.conditionals[0].kind, 'if');
+    assert.equal(r.conditionals[1].kind, 'elif');
+    assert.equal(r.conditionals[2].kind, 'else');
+    assert.equal(r.conditionals[3].kind, 'endif');
+  });
+
+  it('应检测嵌套条件块深度', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#ifdef A
+#ifdef B
+#endif
+#endif`);
+    assert.equal(r.conditionals[0].depth, 0);
+    assert.equal(r.conditionals[1].depth, 1);
+  });
+
+  it('即使宏定义在 #ifdef 内, 也能被提取', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`#ifdef DEBUG
+#define MY_VAL 42
+#endif
+`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'MY_VAL');
+  });
+});
+
+describe('Analyzer - 条件编译块配对诊断', () => {
+  it('孤立的 #endif 应报错', () => {
+    const r = analyze(`shader_type spatial;
+#endif
+void fragment() {}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('#endif'));
+    assert.ok(errs.length >= 1);
+  });
+
+  it('未闭合的 #ifdef 应报错', () => {
+    const r = analyze(`shader_type spatial;
+#ifdef X
+void fragment() {}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error');
+    assert.ok(errs.some(e => e.message.includes('#endif') || e.message.includes('endif')),
+      '应有未闭合 ifdef 诊断, got: ' + errs.map(e => e.message).join('; '));
+  });
+
+  it('#else 重复应报错', () => {
+    const r = analyze(`shader_type spatial;
+#ifdef X
+#else
+#else
+#endif
+void fragment() {}`);
+    const errs = r.diagnostics.filter(d => d.severity === 'error' && d.message.includes('#else'));
+    assert.ok(errs.length >= 1);
+  });
+});
+
+describe('HintScanner - #gdshader-hint-define 宏声明', () => {
+  it('应识别简单宏声明 `// #gdshader-hint-define:NAME`', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`// #gdshader-hint-define:MY_FLAG`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'MY_FLAG');
+    assert.equal(r.macros[0].isFunction, false);
+    assert.equal(r.macros[0].origin, 'hint');
+  });
+
+  it('应识别函数式宏声明 `// #gdshader-hint-define:SQR(x) body`', () => {
+    const { scanHints } = require('../src/parser/hint-scanner');
+    const r = scanHints(`// #gdshader-hint-define:SQR(x) ((x)*(x))`);
+    assert.equal(r.macros.length, 1);
+    assert.equal(r.macros[0].name, 'SQR');
+    assert.equal(r.macros[0].isFunction, true);
+    assert.equal(r.macros[0].parameters![0], 'x');
+  });
+
+  it('Analyzer 应把 hint-define 宏注入为可解析符号', () => {
+    const r = analyze(`shader_type spatial;
+// #gdshader-hint-define:EXT_FLAG
+// #gdshader-hint-define:EXT_FN(a, b) ((a)+(b))
+void fragment() {
+  int n = EXT_FLAG;
+  float y = EXT_FN(1.0, 2.0);
+}`);
+    const flagSym = r.globalScope.resolve('EXT_FLAG');
+    assert.ok(flagSym !== undefined);
+    assert.equal(flagSym!.kind, SymbolKind.Macro);
+    const fnSym = r.globalScope.resolve('EXT_FN');
+    assert.ok(fnSym !== undefined);
+    assert.equal(fnSym!.kind, SymbolKind.Macro);
+    const undefs = r.diagnostics.filter(d => d.message.includes('未定义'));
+    assert.equal(undefs.length, 0, '不应报未定义');
+  });
+});
+
+describe('Analyzer - /** ... */ 文档注释支持', () => {
+  it('应捕获块文档注释', () => {
+    const source = `shader_type spatial;
+/**
+ * 计算向量长度平方
+ * @param v 输入向量
+ * @return 长度平方
+ */
+float len_sq(vec3 v) { return dot(v, v); }
+void fragment() {}`;
+    const r = analyze(source);
+    const sym = Analyzer.resolveAtLine(r.globalScope, 'len_sq', 8);
+    assert.ok(sym !== undefined);
+    assert.ok(sym!.description !== undefined && sym!.description !== null,
+      '应有 description, got: ' + sym!.description);
+    assert.ok(sym!.description!.includes('计算向量长度平方'), '应包含摘要');
+    assert.ok(sym!.description!.includes('@param'));
+    assert.ok(sym!.description!.includes('@return'));
+  });
+
+  it('单行 /** xxx */ 文档注释也应被捕获', () => {
+    const source = `shader_type spatial;
+/** 返回常量 1 */
+float one() { return 1.0; }
+void fragment() {}`;
+    const r = analyze(source);
+    const sym = Analyzer.resolveAtLine(r.globalScope, 'one', 2);
+    assert.ok(sym !== undefined);
+    assert.ok(sym!.description !== undefined && sym!.description !== null);
+    assert.ok(sym!.description!.includes('返回常量 1'));
   });
 });
 

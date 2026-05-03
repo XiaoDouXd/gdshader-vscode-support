@@ -222,14 +222,19 @@ export class GDShaderHoverProvider implements vscode.HoverProvider {
   }
 
   /**
-   * 提取函数声明之前的 /// 文档注释块.
-   * 形如:
+   * 提取函数声明之前的文档注释块. 支持两种形式:
    *   /// summary text
    *   /// @param x description
    *   /// @return description
+   * 以及
+   *   /**
+   *    * summary text
+   *    * @param x description
+   *    * /
    */
   private extractDocComment(document: vscode.TextDocument, declLine: number): string | null {
     const lines: string[] = [];
+    // ── 形式 1: 连续的 /// 行注释 ──
     let i = declLine - 1;
     while (i >= 0) {
       const text = document.lineAt(i).text.trim();
@@ -241,7 +246,38 @@ export class GDShaderHoverProvider implements vscode.HoverProvider {
         break;
       }
     }
-    if (lines.length === 0) return null;
+
+    if (lines.length === 0) {
+      // ── 形式 2: /** ... */ 块文档注释 ──
+      i = declLine - 1;
+      // 跳过空白
+      while (i >= 0 && document.lineAt(i).text.trim() === '') i--;
+      if (i < 0) return null;
+      const endText = document.lineAt(i).text;
+      if (!endText.trim().endsWith('*/')) return null;
+
+      let start = -1;
+      if (/\/\*\*/.test(endText)) {
+        start = i; // 单行 /** xxx */
+      } else {
+        for (let j = i - 1; j >= 0; j--) {
+          const lt = document.lineAt(j).text;
+          if (/\/\*\*/.test(lt)) { start = j; break; }
+          if (!/^\s*(\*|\/\*\*)/.test(lt) && lt.trim() !== '') return null;
+        }
+      }
+      if (start < 0) return null;
+      for (let j = start; j <= i; j++) {
+        let text = document.lineAt(j).text;
+        if (j === start) text = text.replace(/^.*\/\*\*/, '');
+        if (j === i) text = text.replace(/\*\/\s*$/, '');
+        text = text.replace(/^\s*\*\s?/, '').replace(/^\s+/, '');
+        lines.push(text);
+      }
+      while (lines.length > 0 && lines[0].trim() === '') lines.shift();
+      while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+      if (lines.length === 0) return null;
+    }
 
     // 格式化: @param → **@param**, @return → **@return**
     const formatted = lines.map(l => {

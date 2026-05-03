@@ -212,7 +212,7 @@ export class Analyzer {
     this.sourceLines = source ? source.split('\n') : [];
 
     // 扫描 hint 注释
-    this.hintResult = source ? scanHints(source) : { includes: [], typeHints: [], defHints: [], macros: [], hasUnresolvedResIncludes: false };
+    this.hintResult = source ? scanHints(source) : { includes: [], typeHints: [], defHints: [], macros: [], conditionals: [], hasUnresolvedResIncludes: false };
     this.suppressUndefinedCheck = this.hintResult.hasUnresolvedResIncludes;
 
     // 注入内置常量
@@ -231,6 +231,9 @@ export class Analyzer {
 
     // 注入 #define 宏
     this.injectMacros();
+
+    // 检查条件编译块的配对
+    this.checkConditionalBlocks();
 
     // 第一轮: 收集顶层声明 (struct/函数 先注册名称, 使前向引用成立)
     this.collectTopLevelNames(ast);
@@ -283,6 +286,7 @@ export class Analyzer {
     for (const m of this.hintResult.macros) {
       // 不覆盖已有的同名符号 (用户显式声明优先)
       if (this.globalScope.lookupLocal(m.name)) continue;
+      const directive = m.origin === 'hint' ? '#gdshader-hint-define' : '#define';
       const sym: SymbolInfo = {
         name: m.name,
         kind: SymbolKind.Macro,
@@ -290,8 +294,8 @@ export class Analyzer {
         declLine: m.line,
         declColumn: 0,
         description: m.isFunction
-          ? `#define ${m.name}(${(m.parameters ?? []).join(', ')}) ${m.body}`
-          : `#define ${m.name} ${m.body}`,
+          ? `${directive} ${m.name}(${(m.parameters ?? []).join(', ')}) ${m.body}`.trim()
+          : `${directive} ${m.name} ${m.body}`.trim(),
       };
       if (m.isFunction) {
         sym.signature = `${m.name}(${(m.parameters ?? []).join(', ')})`;
@@ -301,6 +305,55 @@ export class Analyzer {
       }
       this.globalScope.declare(sym);
     }
+  }
+
+  /**
+   * 检查条件编译块 (#ifdef/#ifndef/#if/#else/#elif/#endif) 的配对.
+   */
+  private checkConditionalBlocks(): void {
+    if (!this.hintResult.conditionals) return;
+    const stack: { kind: string; line: number; hasElse: boolean }[] = [];
+    for (const c of this.hintResult.conditionals) {
+      switch (c.kind) {
+        case 'ifdef':
+        case 'ifndef':
+        case 'if':
+          stack.push({ kind: c.kind, line: c.line, hasElse: false });
+          break;
+        case 'elif':
+          if (stack.length === 0) {
+            this.addDiagnosticAt(c.line, 0, 10, loc('analyzer.cond.strayElif'), 'error');
+          } else if (stack[stack.length - 1].hasElse) {
+            this.addDiagnosticAt(c.line, 0, 10, loc('analyzer.cond.elifAfterElse'), 'error');
+          }
+          break;
+        case 'else':
+          if (stack.length === 0) {
+            this.addDiagnosticAt(c.line, 0, 10, loc('analyzer.cond.strayElse'), 'error');
+          } else if (stack[stack.length - 1].hasElse) {
+            this.addDiagnosticAt(c.line, 0, 10, loc('analyzer.cond.duplicateElse'), 'error');
+          } else {
+            stack[stack.length - 1].hasElse = true;
+          }
+          break;
+        case 'endif':
+          if (stack.length === 0) {
+            this.addDiagnosticAt(c.line, 0, 10, loc('analyzer.cond.strayEndif'), 'error');
+          } else {
+            stack.pop();
+          }
+          break;
+      }
+    }
+    // 未闭合
+    for (const open of stack) {
+      this.addDiagnosticAt(open.line, 0, 10, loc('analyzer.cond.unclosed', '#' + open.kind), 'error');
+    }
+  }
+
+  /** 用行列信息直接添加诊断 (不依赖 token) */
+  private addDiagnosticAt(line: number, column: number, length: number, message: string, severity: 'error' | 'warning' | 'hint'): void {
+    this.diagnostics.push({ line, column, length, message, severity });
   }
 
   /** 向指定作用域注入 hint-def 符号 */
@@ -1058,25 +1111,73 @@ export class Analyzer {
   }
 
   /**
-   * 提取函数声明之前连续的 /// 文档注释.
-   * 返回格式化的注释文本, 或 null.
+   * 提取函数声明之前的文档注释. 支持两种形式:
+   *   1) 连续的 `/// xxx` 行注释 (紧挨在声明上方)
+   *   2) `/** ... * /` 块文档注释 (紧挨在声明上方)
+   * 返回已合并的多行文本, 或 null.
    */
   private extractDocComment(declLine: number): string | null {
-    const lines: string[] = [];
-    // 函数声明可能在返回类型行, 向上查找 ///
+    // ── 形式 1: /// 连续行注释 ──
+    const tripleLines: string[] = [];
     let i = declLine - 1;
     while (i >= 0 && i < this.sourceLines.length) {
       const text = this.sourceLines[i].trim();
       const tripleMatch = text.match(/^\/\/\/\s?(.*)/);
       if (tripleMatch) {
-        lines.unshift(tripleMatch[1]);
+        tripleLines.unshift(tripleMatch[1]);
         i--;
       } else {
         break;
       }
     }
-    if (lines.length === 0) return null;
-    return lines.join('\n');
+    if (tripleLines.length > 0) return tripleLines.join('\n');
+
+    // ── 形式 2: /** ... */ 块注释 ──
+    // 从 declLine-1 向上寻找以 `*/` 结尾的行, 再向上寻找 `/**` 起始
+    i = declLine - 1;
+    // 跳过空白行
+    while (i >= 0 && this.sourceLines[i].trim() === '') i--;
+    if (i < 0) return null;
+    const endLineText = this.sourceLines[i];
+    if (!endLineText.trim().endsWith('*/')) return null;
+
+    // 从 i 向上找 `/**` 起始行
+    let start = i;
+    let found = false;
+    // 处理单行: /** xxx */
+    if (/\/\*\*/.test(endLineText)) {
+      start = i;
+      found = true;
+    } else {
+      for (let j = i - 1; j >= 0; j--) {
+        if (/\/\*\*/.test(this.sourceLines[j])) {
+          start = j;
+          found = true;
+          break;
+        }
+        // 如果遇到非注释行, 说明不是 /** */ 文档注释 (避免错配到普通 /* */ )
+        if (!/^\s*(\*|\/\*\*)/.test(this.sourceLines[j]) && this.sourceLines[j].trim() !== '') {
+          return null;
+        }
+      }
+    }
+    if (!found) return null;
+
+    // 提取注释文本
+    const rawLines: string[] = [];
+    for (let j = start; j <= i; j++) {
+      let text = this.sourceLines[j];
+      if (j === start) text = text.replace(/^.*\/\*\*/, '');
+      if (j === i) text = text.replace(/\*\/\s*$/, '');
+      // 去掉每行前缀的 " * "
+      text = text.replace(/^\s*\*\s?/, '').replace(/^\s+/, '');
+      rawLines.push(text);
+    }
+    // 去掉首尾空行
+    while (rawLines.length > 0 && rawLines[0].trim() === '') rawLines.shift();
+    while (rawLines.length > 0 && rawLines[rawLines.length - 1].trim() === '') rawLines.pop();
+    if (rawLines.length === 0) return null;
+    return rawLines.join('\n');
   }
 
   // ═══════════════════════════════════════════

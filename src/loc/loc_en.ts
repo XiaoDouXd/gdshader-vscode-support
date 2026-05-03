@@ -62,6 +62,7 @@ export const en: LocaleTable = {
   'completion.folder': 'Folder',
   'completion.hint.ignore': 'Ignore diagnostics for this #include',
   'completion.hint.declare': 'Inject symbol definition (variable or function)',
+  'completion.hint.define': 'Declare a macro (equivalent to #define, analyzer-only)',
   'completion.hint.type': 'Specify type for previous variable',
   'completion.hint.redirection': 'Redirect include to relative path',
   'completion.shaderType': 'Shader type: {0}',
@@ -91,6 +92,12 @@ export const en: LocaleTable = {
   'analyzer.typeMismatch': 'Type mismatch: cannot assign "{0}" to "{1}".',
   'analyzer.argCount': 'Function "{0}" expects {1} argument(s), but {2} were provided.',
   'analyzer.argTypeMismatch': 'Argument "{0}" type mismatch: expected "{1}", got "{2}".',
+  'analyzer.cond.strayElif': 'Stray #elif: missing matching #if/#ifdef/#ifndef.',
+  'analyzer.cond.strayElse': 'Stray #else: missing matching #if/#ifdef/#ifndef.',
+  'analyzer.cond.strayEndif': 'Stray #endif: missing matching #if/#ifdef/#ifndef.',
+  'analyzer.cond.duplicateElse': 'Duplicate #else in the same conditional block.',
+  'analyzer.cond.elifAfterElse': '#elif cannot appear after #else.',
+  'analyzer.cond.unclosed': '{0} is missing a matching #endif.',
 
   // ── parser.ts ──
   'parser.unexpectedToken': "Unexpected token '{0}'.",

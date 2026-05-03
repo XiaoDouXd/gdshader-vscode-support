@@ -7,8 +7,9 @@
  * - `// #gdshader-hint-type:vec3`     — 为前一个变量声明指定类型 (any → vec3)
  * - `/* #gdshader-hint-type:vec3 *​/`  — 同上, 块注释版
  * - `// #gdshader-hint-declare:vec4 func(float p1, in float x);` — 注入一个符号定义到当前作用域
+ * - `// #gdshader-hint-define:NAME` 或 `// #gdshader-hint-define:NAME(a,b) body` — 声明一个宏符号
  *
- * 同时提取所有 #include 指令的信息.
+ * 同时提取所有 #include 指令的信息以及 #define/#ifdef/#if 等预处理块.
  * 注: `#gdshader-hint-def` 是旧名称, 仍然被支持 (等价于 #gdshader-hint-declare).
  */
 
@@ -37,6 +38,8 @@ export interface MacroDef {
   parameters?: string[];
   /** 宏体 (已处理续行符, 单行化) */
   body: string;
+  /** 宏的来源 */
+  origin?: 'define' | 'hint';
 }
 
 export interface HintDef {
@@ -55,12 +58,30 @@ export interface HintDef {
   parameters?: { name: string; typeName: string; qualifier: string }[];
 }
 
+/** 条件预处理块 (#ifdef / #ifndef / #if / #elif / #else / #endif) */
+export interface ConditionalBlock {
+  /** 条件指令: 'ifdef' | 'ifndef' | 'if' | 'elif' | 'else' | 'endif' */
+  kind: 'ifdef' | 'ifndef' | 'if' | 'elif' | 'else' | 'endif';
+  /** 所在行 (0-based) */
+  line: number;
+  /** 条件表达式文本 (如 `DEBUG`, `defined(X) && !Y`), endif/else 为空 */
+  condition: string;
+  /** 嵌套深度 (0-based, #ifdef 处于 0 表示最外层) */
+  depth: number;
+  /** 与开头 `#if`/`#ifdef`/`#ifndef` 配对的起始行; 对于起始自身等于 line */
+  openLine: number;
+  /** 若能配对, 与之配对的 `#endif` 行 */
+  endifLine?: number;
+}
+
 export interface HintScanResult {
   includes: IncludeInfo[];
   typeHints: HintTypeDef[];
   defHints: HintDef[];
-  /** 由 #define 声明的宏 */
+  /** 由 #define 或 #gdshader-hint-define 声明的宏 */
   macros: MacroDef[];
+  /** 条件编译块信息 (用于诊断配对/着色) */
+  conditionals: ConditionalBlock[];
   /** 是否存在未 ignored 的 res:// include */
   hasUnresolvedResIncludes: boolean;
 }
@@ -75,6 +96,9 @@ export function scanHints(source: string): HintScanResult {
   const typeHints: HintTypeDef[] = [];
   const defHints: HintDef[] = [];
   const macros: MacroDef[] = [];
+  const conditionals: ConditionalBlock[] = [];
+  /** 未配对的 #if/#ifdef/#ifndef 栈, 栈元素为 conditionals 数组中的索引 */
+  const openStack: number[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
@@ -97,16 +121,51 @@ export function scanHints(source: string): HintScanResult {
       rest = rest.replace(/\r$/, '').trim();
 
       // 函数式宏: #define NAME(a, b) ...
+      // 仅当 rest 以 "(" 开头 (表示 `NAME` 与 `(` 之间无空格) 时才视为函数式宏
       let isFunction = false;
       let parameters: string[] | undefined;
       let body = rest;
-      const fnMacroMatch = rest.match(/^\(([^)]*)\)\s*(.*)$/);
-      if (fnMacroMatch) {
-        isFunction = true;
-        parameters = fnMacroMatch[1].split(',').map(p => p.trim()).filter(p => p);
-        body = fnMacroMatch[2].trim();
+      if (rest.startsWith('(')) {
+        const paramEnd = rest.indexOf(')');
+        if (paramEnd > 0) {
+          isFunction = true;
+          parameters = rest.substring(1, paramEnd).split(',').map(p => p.trim()).filter(p => p);
+          body = rest.substring(paramEnd + 1).trim();
+        }
       }
-      macros.push({ name: macroName, line: startLine, isFunction, parameters, body });
+      macros.push({ name: macroName, line: startLine, isFunction, parameters, body, origin: 'define' });
+      continue;
+    }
+
+    // ── #ifdef / #ifndef / #if / #elif / #else / #endif ──
+    const condMatch = trimmed.match(/^#\s*(ifdef|ifndef|if|elif|else|endif)\b(.*)$/);
+    if (condMatch) {
+      const kind = condMatch[1] as ConditionalBlock['kind'];
+      // 条件表达式文本, 去掉可能的行内注释
+      let condExpr = condMatch[2].replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '').trim();
+      if (kind === 'else' || kind === 'endif') condExpr = '';
+
+      const depth = openStack.length;
+      const block: ConditionalBlock = {
+        kind, line: i, condition: condExpr,
+        depth: kind === 'endif' ? Math.max(0, depth - 1) : (kind === 'elif' || kind === 'else' ? Math.max(0, depth - 1) : depth),
+        openLine: i,
+      };
+      if (kind === 'ifdef' || kind === 'ifndef' || kind === 'if') {
+        openStack.push(conditionals.length);
+      } else if (kind === 'elif' || kind === 'else') {
+        // 关联到最近的开头
+        if (openStack.length > 0) {
+          block.openLine = conditionals[openStack[openStack.length - 1]].line;
+        }
+      } else if (kind === 'endif') {
+        const openIdx = openStack.pop();
+        if (openIdx !== undefined) {
+          block.openLine = conditionals[openIdx].line;
+          conditionals[openIdx].endifLine = i;
+        }
+      }
+      conditionals.push(block);
       continue;
     }
 
@@ -137,6 +196,20 @@ export function scanHints(source: string): HintScanResult {
       // 不 continue — 同一行可能还有其他内容
     }
 
+    // ── // #gdshader-hint-define:NAME[(args)] [body] 或 /* ... */ ──
+    const lineDefineMatch = trimmed.match(/\/\/\s*#gdshader-hint-define\s*:\s*(.+)/);
+    if (lineDefineMatch) {
+      const m = parseHintDefine(lineDefineMatch[1].trim(), i);
+      if (m) macros.push(m);
+      continue;
+    }
+    const blockDefineMatch = line.match(/\/\*\s*#gdshader-hint-define\s*:\s*(.+?)\s*\*\//);
+    if (blockDefineMatch) {
+      const m = parseHintDefine(blockDefineMatch[1].trim(), i);
+      if (m) macros.push(m);
+      // 不 continue
+    }
+
     // ── // #gdshader-hint-declare:DEFINITION (也兼容旧的 #gdshader-hint-def) ──
     const defMatch = trimmed.match(/\/\/\s*#gdshader-hint-(?:declare|def)\s*:\s*(.+)/);
     if (defMatch) {
@@ -155,7 +228,7 @@ export function scanHints(source: string): HintScanResult {
 
   const hasUnresolvedResIncludes = includes.some(inc => inc.isResPath && !inc.isIgnored && !inc.redirectPath);
 
-  return { includes, typeHints, defHints, macros, hasUnresolvedResIncludes };
+  return { includes, typeHints, defHints, macros, conditionals, hasUnresolvedResIncludes };
 }
 
 /** 检查同行尾部或下一行是否有 #gdshader-hint-ignore */
@@ -180,6 +253,35 @@ function findRedirectionHint(currentLine: string, nextLine?: string): string | u
     if (m2) return m2[1];
   }
   return undefined;
+}
+
+/**
+ * 解析 #gdshader-hint-define 的内容.
+ * 支持:
+ *   NAME
+ *   NAME body text
+ *   NAME(a, b) body text
+ */
+function parseHintDefine(raw: string, line: number): MacroDef | null {
+  // 先匹配 NAME
+  const nameMatch = raw.match(/^(\w+)(.*)$/);
+  if (!nameMatch) return null;
+  const name = nameMatch[1];
+  let rest = nameMatch[2];
+
+  // 函数式: 名称后紧跟 `(`
+  let isFunction = false;
+  let parameters: string[] | undefined;
+  let body = rest.trim();
+  if (rest.startsWith('(')) {
+    const paramEnd = rest.indexOf(')');
+    if (paramEnd > 0) {
+      isFunction = true;
+      parameters = rest.substring(1, paramEnd).split(',').map(p => p.trim()).filter(p => p);
+      body = rest.substring(paramEnd + 1).trim();
+    }
+  }
+  return { name, line, isFunction, parameters, body, origin: 'hint' };
 }
 
 /**

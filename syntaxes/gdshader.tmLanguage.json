@@ -32,6 +32,8 @@
             "0": { "name": "punctuation.definition.comment.gdshader" }
           },
           "patterns": [
+            { "include": "#hint-directives" },
+            { "include": "#doc-tags" },
             {
               "match": "\\[/?[a-z_]+\\]",
               "name": "markup.bold.gdshader"
@@ -44,11 +46,144 @@
           "end": "\\*/",
           "captures": {
             "0": { "name": "punctuation.definition.comment.gdshader" }
-          }
+          },
+          "patterns": [
+            { "include": "#hint-directives" }
+          ]
+        },
+        {
+          "name": "comment.line.triple-slash.gdshader",
+          "begin": "///",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.gdshader" }
+          },
+          "patterns": [
+            { "include": "#hint-directives" },
+            { "include": "#doc-tags" }
+          ]
         },
         {
           "name": "comment.line.double-slash.gdshader",
-          "match": "//.*$"
+          "begin": "//",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.gdshader" }
+          },
+          "patterns": [
+            { "include": "#hint-directives" }
+          ]
+        }
+      ]
+    },
+    "doc-tags": {
+      "patterns": [
+        {
+          "match": "(@param)\\s+([a-zA-Z_]\\w*)",
+          "captures": {
+            "1": { "name": "storage.type.annotation.doc.gdshader" },
+            "2": { "name": "variable.parameter.gdshader" }
+          }
+        },
+        {
+          "name": "storage.type.annotation.doc.gdshader",
+          "match": "@(return|returns|brief|note|warning|see|deprecated|throws|since|author|version)\\b"
+        }
+      ]
+    },
+    "hint-directives": {
+      "patterns": [
+        {
+          "begin": "(#gdshader-hint-type)\\s*(:)\\s*",
+          "end": "$|\\*/",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.hint.gdshader" },
+            "2": { "name": "punctuation.separator.gdshader" }
+          },
+          "patterns": [
+            {
+              "name": "storage.type.gdshader",
+              "match": "\\b(void|bool|int|uint|float|vec2|vec3|vec4|bvec2|bvec3|bvec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|mat2|mat3|mat4|sampler2D|isampler2D|usampler2D|sampler2DArray|isampler2DArray|usampler2DArray|sampler3D|isampler3D|usampler3D|samplerCube|samplerCubeArray|samplerExternalOES)\\b"
+            },
+            {
+              "name": "entity.name.type.gdshader",
+              "match": "\\b[A-Z][a-zA-Z_0-9]*\\b"
+            }
+          ]
+        },
+        {
+          "begin": "(#gdshader-hint-redirection)\\s*(:)\\s*",
+          "end": "$|\\*/",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.hint.gdshader" },
+            "2": { "name": "punctuation.separator.gdshader" }
+          },
+          "patterns": [
+            {
+              "name": "string.unquoted.path.gdshader",
+              "match": "\\S+"
+            }
+          ]
+        },
+        {
+          "begin": "(#gdshader-hint-define)\\s*(:)\\s*",
+          "end": "$|\\*/",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.hint.gdshader" },
+            "2": { "name": "punctuation.separator.gdshader" }
+          },
+          "patterns": [
+            {
+              "match": "^\\s*([A-Za-z_]\\w*)",
+              "captures": {
+                "1": { "name": "entity.name.function.preprocessor.gdshader" }
+              }
+            },
+            { "include": "#numbers" },
+            { "include": "#types" },
+            { "include": "#operators" },
+            { "include": "#punctuation" }
+          ]
+        },
+        {
+          "begin": "(#gdshader-hint-(?:declare|def))\\s*(:)\\s*",
+          "end": "$|\\*/",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.hint.gdshader" },
+            "2": { "name": "punctuation.separator.gdshader" }
+          },
+          "patterns": [
+            { "include": "#types" },
+            { "include": "#storage-qualifiers" },
+            {
+              "match": "\\b([A-Z][a-zA-Z_0-9]*)\\b",
+              "captures": {
+                "1": { "name": "entity.name.type.gdshader" }
+              }
+            },
+            {
+              "match": "\\b([a-zA-Z_]\\w*)(?=\\s*\\()",
+              "captures": {
+                "1": { "name": "entity.name.function.gdshader" }
+              }
+            },
+            {
+              "match": "\\b([a-zA-Z_]\\w*)\\b",
+              "captures": {
+                "1": { "name": "variable.other.gdshader" }
+              }
+            },
+            { "include": "#punctuation" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "match": "#gdshader-hint-ignore\\b",
+          "name": "keyword.control.hint.gdshader"
+        },
+        {
+          "match": "#gdshader-hint-[a-zA-Z_-]+",
+          "name": "keyword.control.hint.gdshader"
         }
       ]
     },

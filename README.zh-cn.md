@@ -134,7 +134,7 @@ void fragment() {
 
 ### 文档注释
 
-插件同时支持两种 Doxygen 风格的文档注释，写在函数声明之上会在悬停提示中自动渲染：
+插件同时支持两种 Doxygen 风格的文档注释 (以 markdown 格式解析)，写在函数声明之上会在悬停提示中自动渲染：
 
 - `///` 连续行注释
 - `/** ... */` 块注释
@@ -144,8 +144,8 @@ void fragment() {
 ```glsl
 /**
  * 计算向量长度的平方。
- * @param v 输入向量
- * @return 长度的平方
+ * - @param v 输入向量
+ * - @return 长度的平方
  */
 float len_sq(vec3 v) { return dot(v, v); }
 ```

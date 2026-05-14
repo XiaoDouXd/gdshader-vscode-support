@@ -114,13 +114,13 @@ var custom_data = get_custom_data(); // #gdshader-hint-type:vec3
 
 ### Doc Comments
 
-Both `///` line doc comments and `/** ... */` block doc comments on the line(s) immediately above a function declaration are picked up and shown in the hover tooltip. Supported tags include `@param`, `@return`, `@brief`, etc.
+Both `///` line doc comments and `/** ... */` block doc comments (markdown) on the line(s) immediately above a function declaration are picked up and shown in the hover tooltip. Supported tags include `@param`, `@return`, `@brief`, etc.
 
 ```glsl
 /**
  * Computes the squared length of a vector.
- * @param v input vector
- * @return length squared
+ * - @param v input vector
+ * - @return length squared
  */
 float len_sq(vec3 v) { return dot(v, v); }
 ```

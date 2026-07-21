@@ -56,6 +56,7 @@ async function main() {
     ['上下文分析', './context.test.js'],
     ['Lexer + Parser', './parser.test.js'],
     ['Analyzer 语义分析', './analyzer.test.js'],
+    ['格式化器', './format.test.js'],
   ];
 
   const results: SuiteResult[] = [];

@@ -12,6 +12,11 @@ export interface LexerDiagnostic {
   message: string;
 }
 
+export interface LexerOptions {
+  /** 是否产出注释 token (LineComment/BlockComment/DocComment). 默认 false, 注释被跳过. 供格式化等场景使用. */
+  includeTrivia?: boolean;
+}
+
 export class Lexer {
   private source: string;
   private pos = 0;
@@ -19,12 +24,14 @@ export class Lexer {
   private column = 0;
   private tokens: Token[] = [];
   readonly diagnostics: LexerDiagnostic[] = [];
+  private readonly includeTrivia: boolean;
 
-  constructor(source: string) {
+  constructor(source: string, options?: LexerOptions) {
     this.source = source;
+    this.includeTrivia = options?.includeTrivia ?? false;
   }
 
-  /** 执行词法分析, 返回 token 列表 (不含注释/空白, 但含 Preprocessor) */
+  /** 执行词法分析, 返回 token 列表 (默认不含注释/空白, 但含 Preprocessor; 传入 includeTrivia 时产出注释 token) */
   tokenize(): Token[] {
     this.tokens = [];
     this.pos = 0;
@@ -189,35 +196,61 @@ export class Lexer {
   }
 
   private readLineComment(): void {
-    // 跳过 // 注释, 不产出 token
+    const startOffset = this.pos;
+    const startLine = this.line;
+    const startCol = this.column;
+    // 读到行末 (不消费换行符)
     while (this.pos < this.source.length && this.source[this.pos] !== '\n') {
       this.advance();
+    }
+    if (this.includeTrivia) {
+      const value = this.source.substring(startOffset, this.pos);
+      this.tokens.push({
+        type: TokenType.LineComment, value,
+        line: startLine, column: startCol,
+        offset: startOffset, length: this.pos - startOffset,
+      });
     }
   }
 
   private readBlockComment(): void {
+    const startOffset = this.pos;
     const startLine = this.line;
     const startCol = this.column;
     // 跳过 /*
     this.advance(); // /
     this.advance(); // *
+    // 文档注释: /** 但非 /**/ (其后紧跟 / 的是空块注释)
     let isDoc = false;
-    if (this.pos < this.source.length && this.source[this.pos] === '*') {
+    if (this.pos < this.source.length && this.source[this.pos] === '*' && this.peek(1) !== '/') {
       isDoc = true;
     }
+    let closed = false;
     while (this.pos < this.source.length) {
       if (this.source[this.pos] === '*' && this.peek(1) === '/') {
         this.advance(); // *
         this.advance(); // /
-        return;
+        closed = true;
+        break;
       }
       this.advance();
     }
+    if (this.includeTrivia) {
+      const value = this.source.substring(startOffset, this.pos);
+      const type = isDoc ? TokenType.DocComment : TokenType.BlockComment;
+      this.tokens.push({
+        type, value,
+        line: startLine, column: startCol,
+        offset: startOffset, length: this.pos - startOffset,
+      });
+    }
     // 未闭合的块注释
-    this.diagnostics.push({
-      line: startLine, column: startCol,
-      length: 2, message: loc('lexer.unclosedBlockComment'),
-    });
+    if (!closed) {
+      this.diagnostics.push({
+        line: startLine, column: startCol,
+        length: 2, message: loc('lexer.unclosedBlockComment'),
+      });
+    }
   }
 
   private readIdentifier(): void {
